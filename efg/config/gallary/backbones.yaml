@@ -1,0 +1,16 @@
+resnets:
+    num_classes: 1000
+    depth: 50
+    out_features: [linear, ]
+    num_groups: 1
+    # Options: FrozenBN, GN, "SyncBN", "BN"
+    norm: BN
+    activation:
+        type: ReLU
+        inplace: True
+    zero_init_residual: True
+    width_per_group: 64
+    stride_in_1x1: False
+    res5_dilation: 1
+    res2_out_channels: 256
+    stem_out_channels: 64

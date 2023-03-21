@@ -1,0 +1,148 @@
+includes:
+    - ${oc.env:EFG_PATH}/efg/config/gallary/datasets/coco.yaml
+
+
+task: train
+
+
+dataset:
+    type: COCODataset
+
+    source: ${detection.source.local}
+    task: coco  # panoptic, keypoints, coco
+    with_gt: True
+
+    format: BGR
+    mask_format: polygon  # bitmask 
+    filter_empty_annotations: True
+    proposal_files_train: null
+
+    num_classes: 80
+
+    processors:
+        train:
+            - ResizeShortestEdge:
+                short_edge_length: [800, ]
+                max_size: 1333
+                sample_style: choice
+            - RandomFlip:
+                p: 0.5
+        val:
+            - ResizeShortestEdge:
+                short_edge_length: 800
+                max_size: 1333
+                sample_style: choice
+
+    test:
+        keypoint_oks_sigmas: 17
+        detections_per_image: 100
+
+dataloader:
+    num_workers: 2 
+    batch_size: 2  # per_gpu 
+
+    aspect_ratio_grouping: True
+    sampler: DistributedGroupSampler
+
+
+model:
+    device: cuda
+
+    weights: detectron2://ImageNetPretrained/MSRA/R-50.pkl
+
+    pixel_mean: [103.530, 116.280, 123.675]
+    pixel_std: [1.0, 1.0, 1.0]
+
+    load_proposals: False
+    mask_on: False
+    keypoint_on: False
+    
+    backbone: 
+        freeze_at: 2
+    
+    resnets:
+        num_classes: null 
+        out_features: [res3, res4, res5]
+        num_groups: 1 
+        depth: 50 
+        norm: FrozenBN
+        activation:
+            type: ReLU
+            inplace: True
+        zero_init_residual: False
+        width_per_group: 64
+        stride_in_1x1: True
+        res5_dilation: 1
+        res2_out_channels: 256
+        stem_out_channels: 64
+
+        deep_stem: False
+
+    fpn: 
+        in_features: [res3, res4, res5]
+        out_channels: 256
+        norm: "" 
+        fuse_type: sum
+        block_in_features: p5
+
+    anchor_generator:
+        sizes: [[32, 64, 128, 256, 512]]
+        aspect_ratios: [[0.5, 1.0, 2.0]]
+        angles: [[-90, 0, 90]]
+        offset: 0.0
+
+    shift_generator:
+        num_shifts: 1 
+        offset: 0.0
+
+    nms_type: normal
+
+    fcos:
+        num_classes: 80 
+        in_features: [p3, p4, p5, p6, p7]
+        num_convs: 4 
+        fpn_strides: [8, 16, 32, 64, 128] 
+        prior_prob: 0.01 
+        centerness_on_reg: True 
+        norm_reg_targets: True
+        score_thresh_test: 0.05
+        topk_candidates_test: 1000
+        nms_thresh_test: 0.6
+        bbox_reg_weights: [1.0, 1.0, 1.0, 1.0]
+        focal_loss_gamma: 2.0
+        focal_loss_alpha: 0.25
+        iou_loss_type: giou
+        center_sampling_radius: 1.5
+        object_sizes_of_interest: [[-1.0, 64], [64, 128], [128, 256], [256, 512], [512, inf]]
+        norm_sync: True
+
+
+solver:
+    lr_scheduler:
+        type: WarmupMultiStep
+        max_iters: 90000
+        steps: [60000, 80000]
+        warmup_factor: 0.001 
+        warmup_iters: 1000
+        warmup_method: linear  # "linear", "constant", "brunin"
+        gamma: 0.1  # Decrease learning rate by GAMMA.
+
+    optimizer:
+        type: D2_SGD 
+        base_lr: 0.01 
+        bias_lr_factor: 1.0 
+        weight_decay: 0.0001 
+        weight_decay_norm: 0.0 
+        momentum: 0.9
+
+
+trainer:
+    checkpoint_iter: 10000
+    log_interval: 20
+
+    evaluators:
+        - COCOEvaluator 
+
+
+ddp:
+    find_unused_parameters: False

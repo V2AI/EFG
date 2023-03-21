@@ -1,0 +1,183 @@
+includes:
+    - ${oc.env:EFG_PATH}/efg/config/gallary/datasets/waymo.yaml
+
+
+task: train
+
+
+dataset:
+    type: CustomWDDataset  # WaymoDetectionDataset
+    
+    # WaymoDetection
+    source: ${detection.source.local1f}
+
+    format: XYZIT
+    nsweeps: 1
+    load_interval: 1
+    classes: ["VEHICLE", "PEDESTRIAN", "CYCLIST"]
+
+    pc_range: [-75.2, -75.2, -2.0, 75.2, 75.2, 4.0]
+    voxel_size: [0.1, 0.1, 0.15] 
+
+    processors:
+        train:
+            - DatabaseSampling:
+                db_info_path: ${dataset.source.root}${dataset.source.gt_database}.pkl
+                sample_groups:
+                    - VEHICLE: 15
+                    - PEDESTRIAN: 10
+                    - CYCLIST: 10
+                min_points: 5
+                difficulty: -1
+            - RandomFlip3D:
+                p: 0.5
+            - GlobalRotation:
+                rotation: 0.78539816  # -n ~ n
+            - GlobalScaling:
+                min_scale: 0.8 
+                max_scale: 1.2 
+            - FilterByRange:
+                pc_range: ${dataset.pc_range} 
+            - PointShuffle:
+                p: 1.0
+            - Voxelization:
+                pc_range: ${dataset.pc_range} 
+                voxel_size: ${dataset.voxel_size} 
+                max_points_in_voxel: 5
+                max_voxel_num: 120000
+        val:
+            - FilterByRange:
+                pc_range: ${dataset.pc_range} 
+                with_gt: False
+            - PointShuffle:
+                p: 1.0
+            - Voxelization:
+                pc_range: ${dataset.pc_range} 
+                voxel_size: ${dataset.voxel_size} 
+                max_points_in_voxel: 5
+                max_voxel_num: 150000
+        test: ${dataset.processors.val}
+
+
+dataloader:
+    num_workers: 6 
+    batch_size: 6  # per_gpu 
+
+
+model:
+    weights: null 
+
+    # common variables
+    hidden_dim: 256
+    aux_loss: true
+    loss:
+        bbox_loss_coef: 4
+        giou_loss_coef: 2
+        class_loss_coef: 1
+        rad_loss_coef: 4
+        matcher:
+            class_weight: ${model.loss.class_loss_coef}
+            bbox_weight: ${model.loss.bbox_loss_coef}
+            giou_weight: ${model.loss.giou_loss_coef}
+            rad_weight: ${model.loss.rad_loss_coef}
+
+    metrics:
+        - type: accuracy
+          params: {}
+
+    sparse_resnets:
+        # num_classes: 1000
+        depth: 18
+        out_features: [res2, res3, res4]
+        num_groups: 1
+        # Options: FrozenBN, GN, "SyncBN", "BN"
+        norm: BN1d
+        activation:
+            type: ReLU
+            inplace: True
+        # zero_init_residual: True
+        width_per_group: 64
+        # stride_in_1x1: False
+        # res5_dilation: 1
+        res1_out_channels: 64
+        stem_out_channels: 32
+
+    fpn:
+        in_features: [res2, res3, res4]
+        top_block_in_feature: "p4"
+        out_channels: 256
+        norm: BN
+        fuse_type: sum
+
+    backbone:
+        type: voxelnet 
+        hidden_dim: ${model.hidden_dim}
+        position_encoding: sine 
+        out_features: [p3, ]
+        reader:
+            norm: BN
+        extractor:
+            resnet: ${model.sparse_resnets}
+            fpn: ${model.fpn} 
+        out_channels: 256
+
+    transformer:
+        hidden_dim: ${model.hidden_dim}
+        nhead: 8
+        enc_layers: 3
+        dec_layers: 3
+        dim_feedforward: 1024
+        dropout: 0
+        num_queries: 1000
+
+    contrastive:
+        mom: 0.999
+        dim: 256
+        eqco: 1000
+        tau: 0.7
+        loss_coeff: 0.2
+
+    dn:
+        enabled: True
+        dn_number: 3  # number of total dn queries; or number of dn groups 
+        dn_box_noise_scale: 0.4
+        dn_label_noise_ratio: 0.5
+
+
+solver:
+    lr_scheduler:
+        type: OneCycle
+        max_epochs: 6  # will be convert to iters
+        pct_start: 0.4
+        base_momentum: 0.85
+        max_momentum: 0.95
+        div_factor: 10.0
+    deform_lr_multi: 0.1
+    optimizer:
+        type: AdamWMulti
+        lr: 1.0e-3
+        lr_backbone: 1.0e-3
+        weight_decay: 0.01
+        eps: 1.0e-9
+        betas: [0.9, 0.99]
+
+    grad_clipper:
+        enabled: False
+        clip_type: norm
+        params:
+            max_norm: 10.0
+
+
+trainer:
+    type: CustomTrainer
+    fade: 1  # fade last 1 epoch
+    eval_period: 1
+    checkpoint_epoch: 3 
+    log_interval: 5
+
+    evaluators:
+        - WaymoDetEvaluator
+
+
+ddp:
+    find_unused_parameters: True

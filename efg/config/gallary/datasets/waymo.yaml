@@ -1,0 +1,9 @@
+detection:
+    version: 1.3.2  # 1.2.0
+    source:
+        local1f:
+            root: ${oc.env:EFG_PATH}/datasets/waymo
+            train: /infos_train_01sweeps_sampled.pkl
+            val: /infos_val_01sweeps_sampled.pkl
+            test: /infos_test_01sweeps_sampled.pkl 
+            gt_database: /gt_database_train_01sweeps_withvelo_sampled_infos

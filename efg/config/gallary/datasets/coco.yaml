@@ -1,0 +1,9 @@
+detection:
+    version: coco2017
+    source:
+        local:
+            coco:
+                root: ${oc.env:EFG_PATH}/datasets/coco 
+                train: [/train2017, /annotations/instances_train2017.json]
+                val: [/val2017, /annotations/instances_val2017.json]
+                test: [/test2017, /annotations/image_info_test2017.json]

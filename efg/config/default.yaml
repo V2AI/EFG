@@ -1,0 +1,57 @@
+# task infomation
+task: train  # train, val, test 
+
+
+dataset: null
+
+
+# model
+model:
+    device: cuda
+    weights: null
+
+dataloader:
+    sampler: DistributedInfiniteSampler
+    eval_sampler: InferenceSampler 
+    num_workers: 2
+    batch_size: 16
+
+
+# ddp
+ddp:
+    backend: nccl
+    master_port: 12345
+    num_gpus: 1
+    num_machines: 1
+    machine_rank: 0
+    find_unused_parameters: False 
+
+solver:
+    lr_scheduler:
+        max_epochs: null
+        max_iters: null
+    optimizer:
+        lr: null
+    grad_clipper:
+        enabled: false
+
+
+# trainer 
+trainer:
+    type: DefaultTrainer
+    log_interval: 20 
+    window_size: ${trainer.log_interval} 
+    output_dir: ${oc.env:EFG_CACHE_DIR} 
+    checkpoint_epoch: null
+    checkpoint_iter: null
+    checkpoint_period: 10000
+    early_stop: False
+    amp:
+        enabled: False
+    sync_bn: False
+
+
+misc:
+    debug: false
+    seed: -1
+    cudnn_benchmark: false 

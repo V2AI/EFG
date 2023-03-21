@@ -1,0 +1,142 @@
+includes:
+    - ${oc.env:EFG_PATH}/efg/config/gallary/datasets/waymo.yaml
+
+task: train
+
+dataset:
+    type: WaymoDetectionDataset 
+
+    format: XYZIT
+    nsweeps: 1
+    load_interval: 1
+    classes: ["VEHICLE", "PEDESTRIAN", "CYCLIST"]
+    pc_range: [-75.2, -75.2, -2.0, 75.2, 75.2, 4.0]
+    voxel_size: [0.1, 0.1, 0.15]
+
+    # WaymoDetection
+    source: ${detection.source.local1f}
+    processors:
+        train:
+            - DatabaseSampling:
+                db_info_path: ${dataset.source.root}${dataset.source.gt_database}.pkl
+                sample_groups:
+                    - VEHICLE: 15
+                    - PEDESTRIAN: 10
+                    - CYCLIST: 10
+                min_points: 5
+                difficulty: -1
+            - RandomFlip3D:
+                p: 0.5
+            - GlobalRotation:
+                rotation: 0.78539816
+            - GlobalScaling:
+                min_scale: 0.95
+                max_scale: 1.05
+            - FilterByRange:
+                pc_range: ${dataset.pc_range} 
+            - PointShuffle:
+                p: 0.5
+            - Voxelization:
+                pc_range: ${dataset.pc_range} 
+                voxel_size: ${dataset.voxel_size} 
+                max_points_in_voxel: 5
+                max_voxel_num: 120000
+        val:
+            - FilterByRange:
+                pc_range: ${dataset.pc_range}
+                with_gt: False
+            - Voxelization:
+                pc_range: ${dataset.pc_range} 
+                voxel_size: ${dataset.voxel_size} 
+                max_points_in_voxel: 5
+                max_voxel_num: 150000
+
+
+dataloader:
+    num_workers: 6 
+    batch_size: 6  # per_gpu 
+
+
+model:
+    type: VoxeNet
+    reader:
+        num_input_features: 5
+        norm: BN
+    backbone:
+        num_input_features: 5
+        norm: BN1d
+    neck:
+        num_input_features: 256
+        layer_nums: [5, 5]
+        ds_layer_strides: [1, 2]
+        ds_num_filters: [128, 256]
+        us_layer_strides: [1, 2]
+        us_num_filters: [256, 256]
+        norm: BN
+    head:
+        in_channels: 512  # sum(us_num_filters)
+        norm:
+            type: BN
+        tasks: [ { num_classes: 3, class_names: ["VEHICLE", "PEDESTRIAN", "CYCLIST"] } ]
+        misc:
+            dataset: waymo
+            weight: 2
+            code_weights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+            common_heads:
+                reg: [2, 2]
+                height: [1, 2]
+                dim: [3, 2] 
+                rot: [2, 2]
+    loss:
+        out_size_factor: 8
+        dense_reg: 1
+        gaussian_overlap: 0.1
+        max_objs: 500
+        min_radius: 2
+
+    post_process:
+        post_center_limit_range: [-80, -80, -10.0, 80, 80, 10.0]
+        nms:
+            nms_pre_max_size: 4096
+            nms_post_max_size: 300
+            nms_iou_threshold: 0.7
+        score_threshold: 0.1
+        pc_range: ${dataset.pc_range} 
+        out_size_factor: 8
+        voxel_size: ${dataset.voxel_size}
+
+
+solver:
+    lr_scheduler:
+        type: OneCycle
+        max_epochs: 36  # will be convert to iters
+        # max_iter: 120000  # 36 epoch * len(waymo): 158081 / batch size 38
+        pct_start: 0.4
+        base_momentum: 0.85
+        max_momentum: 0.95
+        div_factor: 10.0
+    optimizer:
+        type: AdamW 
+        lr: 0.003
+        weight_decay: 0.01
+        betas: [0.9, 0.99]
+        amsgrad: False
+    grad_clipper:
+        enabled: True 
+        clip_type: norm 
+        params:
+            norm_type: 2.0
+            max_norm: 10.0
+
+
+trainer:
+    eval_period: 1
+    checkpoint_epoch: 1 
+    log_interval: 5
+
+    evaluators:
+        - WaymoDetEvaluator
+
+
+ddp:
+    find_unused_parameters: False 

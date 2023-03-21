@@ -1,0 +1,10 @@
+detection:
+    version: "1.0"
+    eval_version: detection_cvpr_2019
+    source:
+        local11f:
+            root: ${oc.env:EFG_PATH}/datasets/nuscenes
+            train: /infos_train_11sweeps_withvelo_new.pkl
+            val: /infos_val_11sweeps_withvelo_new.pkl
+            test: ${detection.source.local10f_new.val}
+            gt_database: /gt_database_train_11sweeps_withvelo_new_infos
