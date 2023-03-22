@@ -1,13 +1,15 @@
-# EFG
+<div align=center><img src=".github/efg_logo.jpeg" width="400" ><div align=left>
+<br/>
+
 An Efficient, Flexible, and General deep learning framework that retains minimal. Users can use EFG to conduct any research topics following example project templates. 
 
-## What's New
+# What's New
 * 2023.03.21 Code release of CVPR2023 **Highlight** paper: [ConQueR: Query Contrast Voxel-DETR for 3D Object Detection](https://github.com/poodarchu/EFG/blob/master/projects/detection.3d/waymo/conquer/README.md).
 * 2023.03.21 Code release of EFG codebase, with support for 2D object detection (MS COCO dataset) and 3D object detection (Waymo and nuScenes dataset).
 
-## 1. Installation
+# 1. Installation
 
-### 1.1 Prerequisites
+## 1.1 Prerequisites
 * gcc 5 - 7
 * python >= 3.6
 * cuda >= 10.2
@@ -25,7 +27,7 @@ waymo-open-dataset-tf-2-1-0==1.2.0
 waymo-open-dataset-tf-2-4-0==1.3.1
 
 ```
-### 1.2 Build from source
+## 1.2 Build from source
 
 ```shell
 git clone https://github.com/poodarchu/EFG.git
@@ -35,7 +37,7 @@ pip install -v -e .
 echo "export EFG_CACHE_DIR=/path/to/your/logs/dir" > ~/.bashrc
 ```
 
-## 2. Data
+# 2. Data
 ## 2.1 Data Preparation - Waymo
 ```shell
 
@@ -58,15 +60,15 @@ python cli/data_preparation/waymo/create_data.py --root-path datasets/waymo --sp
 
 ```
 
-### 2.2 Data Preparation - nuScenes
+## 2.2 Data Preparation - nuScenes
 ```shell
 # create softlink to datasets
 cd /path/to/EFG/datasets; ln -s /path/to/nuscenes/dataset/root nuscenes; cd ..
 python cli/data_preparation/nuscenes/create_data.py --root-path datasets/nuscenes --version v1.0-trainval --nsweeps 11  # 1 sample frame + 10 sweeps frame (0.5s)
 ```
 
-## 3. Get Started
-###  3.1 Training & Evaluation
+# 3. Get Started
+##  3.1 Training & Evaluation
 
 ```shell
 # cd playground/path/to/experiment/directory
@@ -82,7 +84,7 @@ efg_run --num-gpus x task val
 ```
 
 
-## 4. Model ZOO
+# 4. Model ZOO
 
 All models are trained and evaluated on 8 x NVIDIA A100 GPUs.
 
@@ -102,5 +104,5 @@ All models are trained and evaluated on 8 x NVIDIA A100 GPUs.
 |  CenterPoint  |    20    | 59.0 | 66.7 |      |
 
 
-## 5. Call for contributions
+# 5. Call for contributions
 EFG is currently in a relatively preliminary stage, and we still have a lot of work to do, if you are interested in contributing, you can email me at poodarchu@gmail.com.
