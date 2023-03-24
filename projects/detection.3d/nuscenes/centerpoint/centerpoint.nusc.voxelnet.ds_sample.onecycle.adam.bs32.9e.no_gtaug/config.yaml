@@ -1,0 +1,175 @@
+includes:
+    - ${oc.env:EFG_PATH}/efg/config/gallary/datasets/nuscenes.yaml
+
+task: train
+
+dataset:
+    type: nuScenesDetectionDataset
+
+    nusc: ${detection}
+    format: XYZIT
+    nsweeps: 11
+    load_interval: 1
+    classes: ["car", "truck", "construction_vehicle", "bus", "trailer", "barrier", "motorcycle", "bicycle", "pedestrian", "traffic_cone"]
+    pc_range: [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
+    voxel_size: [0.075, 0.075, 0.2]
+
+    # WaymoDetection
+    source: ${detection.source.local11f}
+    eval_source: ${dataset.source}
+
+    processors:
+        train:
+            # - DatabaseSampling:
+            #     db_info_path: ${dataset.source.root}${dataset.source.gt_database}.pkl
+            #     sample_groups:
+            #         - car: 2
+            #         - truck: 3
+            #         - construction_vehicle: 7
+            #         - bus: 4
+            #         - trailer: 6
+            #         - barrier: 2
+            #         - motorcycle: 6
+            #         - bicycle: 6
+            #         - pedestrian: 2
+            #         - traffic_cone: 2
+            #     min_points: 5
+            #     difficulty: -1
+            #     rm_points_after_sample: True
+            - RandomFlip3D:
+                p: 0.5
+            - GlobalRotation:
+                rotation: 0.785 
+            - GlobalScaling:
+                min_scale: 0.9
+                max_scale: 1.1
+            - GlobalTranslation:
+                std: [0.5, 0.5, 0.5]
+            - PointShuffle:
+                p: 1.0
+            - FilterByRangeInPolygon:
+                pc_range: ${dataset.pc_range} 
+            - Voxelization:
+                pc_range: ${dataset.pc_range} 
+                voxel_size: ${dataset.voxel_size} 
+                max_points_in_voxel: 10
+                max_voxel_num: 120000
+        val:
+            - PointShuffle:
+                p: 1.0
+            - FilterByRangeInPolygon:
+                pc_range: ${dataset.pc_range} 
+                with_gt: False
+            - Voxelization:
+                pc_range: ${dataset.pc_range} 
+                voxel_size: ${dataset.voxel_size} 
+                max_points_in_voxel: 10
+                max_voxel_num: 160000
+
+
+dataloader:
+    num_workers: 4 
+    batch_size: 4  # per_gpu 
+
+
+model:
+    type: VoxeNet
+    reader:
+        num_input_features: 5
+        norm: BN
+    backbone:
+        num_input_features: 5
+        norm: BN1d
+    neck:
+        num_input_features: 256
+        layer_nums: [5, 5]
+        ds_layer_strides: [1, 2]
+        ds_num_filters: [128, 256]
+        us_layer_strides: [1, 2]
+        us_num_filters: [256, 256]
+        norm: BN
+    head:
+        in_channels: 512  # sum(us_num_filters)
+        norm:
+            type: BN
+        tasks: 
+            - num_classes: 1
+              class_names: ["car"]
+            - num_classes: 2 
+              class_names: ["truck", "construction_vehicle"]
+            - num_classes: 2 
+              class_names: ["bus", "trailer"] 
+            - num_classes: 1 
+              class_names: ["barrier"]
+            - num_classes: 2 
+              class_names: ["motorcycle", "bicycle"] 
+            - num_classes: 2 
+              class_names: ["pedestrian", "traffic_cone"]
+
+        code_weights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2, 1.0, 1.0]
+        loc_weight: 0.25
+
+        share_conv_channel: 64
+        dcn_head: False
+
+        dataset: nuscenes 
+        common_heads:
+            reg: [2, 2]
+            height: [1, 2]
+            dim: [3, 2] 
+            rot: [2, 2]
+            vel: [2, 2]
+
+    assigner:
+        out_size_factor: 8
+        dense_reg: 1
+        gaussian_overlap: 0.1
+        max_objs: 500
+        min_radius: 2
+
+    post_process:
+        post_center_limit_range: [-61.2, -61.2, -10.0, 61.2, 61.2, 10.0]
+        nms:
+            nms_pre_max_size: 1000
+            nms_post_max_size: 83
+            nms_iou_threshold: 0.2
+        score_threshold: 0.1
+        pc_range: ${dataset.pc_range} 
+        out_size_factor: 8
+        voxel_size: ${dataset.voxel_size}
+
+
+solver:
+    lr_scheduler:
+        type: OneCycle
+        max_epochs: 9  # will be convert to iters
+        pct_start: 0.4
+        base_momentum: 0.85
+        max_momentum: 0.95
+        div_factor: 10.0
+    optimizer:
+        type: AdamW
+        lr: 0.001
+        weight_decay: 0.01
+        betas: [0.9, 0.99]
+        amsgrad: False
+    grad_clipper:
+        enabled: True 
+        clip_type: value  # option norm 
+        params:
+            clip_value: 35.0
+
+
+trainer:
+    eval_period: 1
+    checkpoint_epoch: 5
+    log_interval: 5
+
+    evaluators:
+        - nuScenesDetEvaluator
+
+    sync_bn: False
+
+
+ddp:
+    find_unused_parameters: False 
