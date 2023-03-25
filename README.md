@@ -106,3 +106,13 @@ All models are trained and evaluated on 8 x NVIDIA A100 GPUs.
 
 # 5. Call for contributions
 EFG is currently in a relatively preliminary stage, and we still have a lot of work to do, if you are interested in contributing, you can email me at poodarchu@gmail.com.
+
+# 6. Citation
+```shell
+@misc{zhu2023efg,
+    title={EFG: An Efficient, Flexible, and General deep learning framework that retains minimal},
+    author={EFG Contributors},
+    howpublished = {\url{https://github.com/poodarchu/efg}},
+    year={2023}
+}
+```
