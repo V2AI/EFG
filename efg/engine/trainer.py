@@ -209,7 +209,6 @@ class DefaultTrainer(TrainerBase):
         )
 
     def resume_or_load(self, resume=False):
-
         all_model_checkpoints = [
             os.path.join(self.config.trainer.output_dir, file)
             for file in PathManager.ls(self.config.trainer.output_dir)
@@ -218,13 +217,27 @@ class DefaultTrainer(TrainerBase):
         ]
         all_model_checkpoints = sorted(all_model_checkpoints, key=os.path.getmtime)
 
-        if resume and PathManager.isfile(all_model_checkpoints[-1]):
-            self.start_iter = self.checkpointer.load(all_model_checkpoints[-1], resume=resume).get("iteration", -1) + 1
-            self.iter = self.start_iter
-            if self.max_epochs is not None:
-                self.start_epochs = self.start_iter // len(self.dataloader)
-        elif PathManager.isfile(all_model_checkpoints[-1]):
-            self.checkpointer.load(all_model_checkpoints[-1])
+        if len(all_model_checkpoints) > 0:
+            if self.config.model.weights is not None:
+                matched = np.nonzero(np.array(
+                    [pts.endswith(self.config.model.weights.split("/")[-1]) for pts in all_model_checkpoints]
+                ))[0]
+                if matched.shape[0] > 0:
+                    load_path = all_model_checkpoints[matched[0]]
+                else:
+                    logger.info(
+                        "Cannot find matched checkpoints as {self.config.model.weights}, try to load the latest."
+                    )
+                    load_path = all_model_checkpoints[-1]
+            else:
+                load_path = all_model_checkpoints[-1]
+            if resume and PathManager.isfile(load_path):
+                self.start_iter = self.checkpointer.load(load_path, resume=resume).get("iteration", -1) + 1
+                self.iter = self.start_iter
+                if self.max_epochs is not None:
+                    self.start_epochs = self.start_iter // len(self.dataloader)
+            elif PathManager.isfile(load_path):
+                self.checkpointer.load(load_path)
         else:
             logger.info("Checkpoint does not exist")
             raise ModuleNotFoundError
