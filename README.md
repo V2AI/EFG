@@ -1,10 +1,10 @@
 <div align=center><img src=".github/efg_logo.jpeg" width="400" ><div align=left>
 <br/>
 
-An Efficient, Flexible, and General deep learning framework that retains minimal. Users can use EFG to conduct any research topics following example project templates. 
+An Efficient, Flexible, and General deep learning framework that retains minimal. Users can use EFG to explore any research topics following project templates. 
 
 # What's New
-* 2023.03.21 Code release of CVPR2023 **Highlight** paper: [ConQueR: Query Contrast Voxel-DETR for 3D Object Detection](https://github.com/poodarchu/EFG/blob/master/projects/detection.3d/waymo/conquer/README.md).
+* 2023.03.21 Code release of CVPR2023 **Highlight** paper: [ConQueR: Query Contrast Voxel-DETR for 3D Object Detection](https://github.com/poodarchu/EFG/blob/master/playground/detection.3d/waymo/conquer/README.md).
 * 2023.03.21 Code release of EFG codebase, with support for 2D object detection (MS COCO dataset) and 3D object detection (Waymo and nuScenes dataset).
 
 # 0. Benchmarking

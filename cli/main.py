@@ -59,7 +59,7 @@ def worker(args):
     config = configuration.get_config()
 
     # setup global logger
-    output_dir = os.path.join(config.trainer.output_dir, os.getcwd().split('playground')[1][1:])
+    output_dir = os.path.join(config.trainer.output_dir, "efg", os.getcwd().split('playground')[1][1:])
     if comm.is_main_process() and output_dir:
         PathManager.mkdirs(output_dir)
         link_log(output_dir)
