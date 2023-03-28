@@ -7,6 +7,10 @@ An Efficient, Flexible, and General deep learning framework that retains minimal
 * 2023.03.21 Code release of CVPR2023 **Highlight** paper: [ConQueR: Query Contrast Voxel-DETR for 3D Object Detection](https://github.com/poodarchu/EFG/blob/master/projects/detection.3d/waymo/conquer/README.md).
 * 2023.03.21 Code release of EFG codebase, with support for 2D object detection (MS COCO dataset) and 3D object detection (Waymo and nuScenes dataset).
 
+# 0. Benchmarking
+<div align=center><img src=".github/efg_benchmark.png" width="800" ><div align=left>
+
+
 # 1. Installation
 
 ## 1.1 Prerequisites
