@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Modifyed by Benjin ZHU
 import copy
 import math
 from typing import List
@@ -13,7 +14,7 @@ from efg.data.structures.shape_spec import ShapeSpec
 """
 Registry for modules that creates object detection anchors for feature maps.
 
-The registered object will be called with `obj(cfg, input_shape)`.
+The registered object will be called with `obj(config, input_shape)`.
 """
 
 
@@ -62,12 +63,12 @@ class DefaultAnchorGenerator(nn.Module):
     For a set of image sizes and feature maps, computes a set of anchors.
     """
 
-    def __init__(self, cfg, input_shape: List[ShapeSpec]):
+    def __init__(self, config, input_shape: List[ShapeSpec]):
         super().__init__()
-        sizes = cfg.model.anchor_generator.sizes
-        aspect_ratios = cfg.model.anchor_generator.aspect_ratios
+        sizes = config.sizes
+        aspect_ratios = config.aspect_ratios
         self.strides = [x.stride for x in input_shape]
-        self.offset = cfg.model.anchor.generator.offset
+        self.offset = config.offset
 
         assert 0.0 <= self.offset < 1.0, self.offset
 
@@ -120,7 +121,6 @@ class DefaultAnchorGenerator(nn.Module):
                 location, on that feature map.
                 For example, if at every pixel we use anchors of 3 aspect
                 ratios and 5 sizes, the number of anchors is 15.
-                (See also ANCHOR_GENERATOR.SIZES and ANCHOR_GENERATOR.ASPECT_RATIOS in config)
 
                 In standard RPN models, `num_cell_anchors` on every feature map is the same.
         """
@@ -202,13 +202,13 @@ class RotatedAnchorGenerator(nn.Module):
     The anchor generator used by Rotated RPN (RRPN).
     """
 
-    def __init__(self, cfg, input_shape: List[ShapeSpec]):
+    def __init__(self, config, input_shape: List[ShapeSpec]):
         super().__init__()
-        sizes = cfg.model.anchor_generator.sizes
-        aspect_ratios = cfg.model.anchor_generator.aspect_ratios
-        angles = cfg.model.anchor_generator.angles
+        sizes = config.sizes
+        aspect_ratios = config.aspect_ratios
+        angles = config.angles
         self.strides = [x.stride for x in input_shape]
-        self.offset = cfg.model.anchor_generator.offset
+        self.offset = config.offset
 
         assert 0.0 <= self.offset < 1.0, self.offset
 
@@ -270,8 +270,6 @@ class RotatedAnchorGenerator(nn.Module):
                 location, on that feature map.
                 For example, if at every pixel we use anchors of 3 aspect
                 ratios, 2 sizes and 5 angles, the number of anchors is 30.
-                (See also ANCHOR_GENERATOR.SIZES, ANCHOR_GENERATOR.ASPECT_RATIOS
-                and ANCHOR_GENERATOR.ANGLES in config)
 
                 In standard RRPN models, `num_cell_anchors` on every feature map is the same.
         """
@@ -355,12 +353,12 @@ class ShiftGenerator(nn.Module):
     For a set of image sizes and feature maps, computes a set of shifts.
     """
 
-    def __init__(self, cfg, input_shape: List[ShapeSpec]):
+    def __init__(self, config, input_shape: List[ShapeSpec]):
         super().__init__()
 
-        self.num_shifts = cfg.model.shift_generator.num_shifts
+        self.num_shifts = config.num_shifts
         self.strides = [x.stride for x in input_shape]
-        self.offset = cfg.model.shift_generator.offset
+        self.offset = config.offset
 
         self.num_features = len(self.strides)
 

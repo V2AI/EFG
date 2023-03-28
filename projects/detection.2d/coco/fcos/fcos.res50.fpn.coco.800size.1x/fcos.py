@@ -40,7 +40,7 @@ def build_backbone(config, input_shape=None):
 
 def build_shift_generator(config, input_shape):
 
-    return ShiftGenerator(config, input_shape)
+    return ShiftGenerator(config.model.shift_generator, input_shape)
 
 
 def permute_to_N_HWA_K(tensor, K):

@@ -66,7 +66,7 @@ def build_shift_generator(config, input_shape):
         an instance of :class:`ShiftGenerator`
     """
 
-    return ShiftGenerator(config, input_shape)
+    return ShiftGenerator(config.model.shift_generator, input_shape)
 
 
 def positive_bag_loss(logits, mask, gaussian_probs):
