@@ -61,7 +61,7 @@ class TrainerBase:
             for self.iter in range(self.start_iter, self.max_iters):
                 if self.iter % (self.config.trainer.window_size * 20) == 0:
                     logger.info(f"Host Name: {socket.gethostname()}")
-                    logger.info(f"Experiment Dir: {self.config.trainer.output_dir.split('efg/')[1]}")
+                    logger.info(f"Experiment Dir: {self.config.trainer.output_dir.split('EFG/')[-1]}")
                 self.before_step()
                 # by default, a step contains data_loading and model forward,
                 # loss backward is executed in after_step for better expansibility
