@@ -66,11 +66,8 @@ class WaymoDetectionDataset(BaseDataset):
         info = deepcopy(self.dataset_dicts[idx])
 
         # load point cloud data
-        if "s3" not in self.root_path:
-            if not os.path.isabs(info["path"]):
-                info["path"] = os.path.join(self.root_path, info["path"])
-        else:
-            info["path"] = self.root_path.replace("Waymo", "Waymo/v1.3.2") + "/" + info["path"]
+        if not os.path.isabs(info["path"]):
+            info["path"] = os.path.join(self.root_path, info["path"])
         obj = pickle.load(PathManager.open(info["path"], "rb"))
         points = read_single_waymo(obj)
 
@@ -85,8 +82,6 @@ class WaymoDetectionDataset(BaseDataset):
 
             for i in range(nsweeps - 1):
                 sweep = info["sweeps"][i]
-                if "s3" in self.root_path:
-                    sweep["path"] = self.root_path.replace("Waymo", "Waymo/v1.3.2") + "/" + sweep["path"]
                 sweep_obj = pickle.load(PathManager.open(sweep["path"], "rb"))
                 points_sweep, times_sweep = read_single_waymo_sweep(sweep, sweep_obj)
                 sweep_points_list.append(points_sweep)

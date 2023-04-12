@@ -125,11 +125,8 @@ class nuScenesDetectionDataset(BaseDataset):
     def __getitem__(self, idx):
         info = deepcopy(self.dataset_dicts[idx])
 
-        if "s3" in self.info_path:
-            lidar_path = info["lidar_path"].replace("datasets/nuscenes", "s3://Datasets/nuScenes")
-        elif info["lidar_path"].startswith("datasets/nuscenes"):
+        if info["lidar_path"].startswith("datasets/nuscenes"):
             lidar_path = os.path.join(os.environ["EFG_PATH"], info["lidar_path"])
-
         points = read_file(lidar_path)
 
         # points[:, 3] /= 255
@@ -143,10 +140,7 @@ class nuScenesDetectionDataset(BaseDataset):
 
         for i in range(nsweeps - 1):
             sweep = info["sweeps"][i]
-
-            if "s3" in self.info_path:
-                slidar_path = sweep["lidar_path"].replace("datasets/nuscenes", "s3://Datasets/nuScenes")
-            elif sweep["lidar_path"].startswith("datasets/nuscenes"):
+            if sweep["lidar_path"].startswith("datasets/nuscenes"):
                 slidar_path = os.path.join(os.environ["EFG_PATH"], sweep["lidar_path"])
             sweep["lidar_path"] = slidar_path
 
