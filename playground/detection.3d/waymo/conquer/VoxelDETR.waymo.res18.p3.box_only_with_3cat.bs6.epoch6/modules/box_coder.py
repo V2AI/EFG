@@ -10,7 +10,6 @@ from .utils import normalize_period
 
 
 class BoxCoder:
-
     __metaclass__ = ABCMeta
 
     @abstractproperty
@@ -33,14 +32,13 @@ class BoxCoder:
 
 
 class VoxelBoxCoder3D(BoxCoder):
-
     def __init__(self, voxel_size, pc_range, n_dim=7, device=torch.device("cpu"), **opts):
         self.device = device
         self.voxel_size = torch.tensor(voxel_size, device=device)
         self.pc_range = torch.tensor(pc_range, device=device)
         self.pc_size = self.pc_range[3:] - self.pc_range[:3]
         self.z_normalizer = 10.0
-        self.grid_size = self.pc_size.div(self.voxel_size, rounding_mode='trunc')
+        self.grid_size = self.pc_size.div(self.voxel_size, rounding_mode="trunc")
         self.n_dim = n_dim
         for k, v in opts.items():
             setattr(self, k, v)
@@ -50,7 +48,6 @@ class VoxelBoxCoder3D(BoxCoder):
         return self.n_dim
 
     def _encode(self, target):
-
         target["labels"] -= 1
 
         target["gt_boxes"][:, :2] -= self.pc_range[:2]
@@ -73,7 +70,6 @@ class VoxelBoxCoder3D(BoxCoder):
         return target
 
     def _decode(self, pred_boxes):
-
         # recover predictions
         pred_boxes[..., :2] = pred_boxes[..., :2] * self.pc_size[:2] + self.pc_range[:2]
         pred_boxes[..., 2] = pred_boxes[..., 2] * 2 * self.z_normalizer + -1 * self.z_normalizer

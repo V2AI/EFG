@@ -31,8 +31,7 @@ class BaseDataset(Dataset):
         self.path_manager = PathManager()
 
     def __getitem__(self, index):
-        """Load data, apply transforms, converto to Instances.
-        """
+        """Load data, apply transforms, converto to Instances."""
         raise NotImplementedError
 
     def __len__(self):

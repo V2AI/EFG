@@ -76,7 +76,6 @@ def build_dataset(config):
 
 
 def build_dataloader(config, dataset, msg=False):
-
     if config.task == "train":
         num_devices = comm.get_world_size()
         rank = comm.get_rank()

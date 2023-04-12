@@ -22,7 +22,6 @@ def drop_arrays_by_name(gt_names, used_classes):
 
 @DATASETS.register()
 class nuScenesDetectionDataset(BaseDataset):
-
     def __init__(self, config):
         super(nuScenesDetectionDataset, self).__init__(config)
         self.config = config
@@ -82,7 +81,6 @@ class nuScenesDetectionDataset(BaseDataset):
         return meta
 
     def load_infos(self):
-
         with open(self.info_path, "rb") as f:
             _nusc_infos_all = pickle.load(f)
 
@@ -123,7 +121,6 @@ class nuScenesDetectionDataset(BaseDataset):
         return len(self.dataset_dicts)
 
     def __getitem__(self, idx):
-
         info = deepcopy(self.dataset_dicts[idx])
 
         if info["lidar_path"].startswith("datasets/nuscenes"):
@@ -136,8 +133,9 @@ class nuScenesDetectionDataset(BaseDataset):
         sweep_times_list = [np.zeros((points.shape[0], 1))]
 
         nsweeps = self.meta["nsweeps"]
-        assert (nsweeps - 1) <= len(info["sweeps"]), \
-            "nsweeps {} should not greater than list length {}.".format(nsweeps, len(info["sweeps"]))
+        assert (nsweeps - 1) <= len(info["sweeps"]), "nsweeps {} should not greater than list length {}.".format(
+            nsweeps, len(info["sweeps"])
+        )
 
         for i in range(nsweeps - 1):
             sweep = info["sweeps"][i]
@@ -170,7 +168,12 @@ class nuScenesDetectionDataset(BaseDataset):
 
         if self.is_train:
             # N x 9: [x, y, z, l, w, h, vx, vy, r]
-            mask = drop_arrays_by_name(info["gt_names"], ["ignore", ])
+            mask = drop_arrays_by_name(
+                info["gt_names"],
+                [
+                    "ignore",
+                ],
+            )
             info["annotations"] = {
                 "gt_boxes": info.pop("gt_boxes")[mask],
                 "gt_names": info.pop("gt_names")[mask],
@@ -193,6 +196,8 @@ class nuScenesDetectionDataset(BaseDataset):
         _dict_select(target, keep)
 
     def _add_class_labels_to_annos(self, info):
-        info["annotations"]["labels"] = np.array(
-            [self.class_names.index(name) + 1 for name in info["annotations"]["gt_names"]]
-        ).astype(np.int64).reshape(-1)
+        info["annotations"]["labels"] = (
+            np.array([self.class_names.index(name) + 1 for name in info["annotations"]["gt_names"]])
+            .astype(np.int64)
+            .reshape(-1)
+        )

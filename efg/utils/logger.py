@@ -34,9 +34,7 @@ class _ColorfulFormatter(logging.Formatter):
 
 
 @functools.lru_cache()  # so that calling setup_logger multiple times won't add many handlers
-def setup_logger(
-    output=None, distributed_rank=0, *, color=True, name="efg", abbrev_name=None
-):
+def setup_logger(output=None, distributed_rank=0, *, color=True, name="efg", abbrev_name=None):
     """
     Initialize the efg logger and set its verbosity level to "INFO".
     Args:
@@ -58,9 +56,7 @@ def setup_logger(
     if abbrev_name is None:
         abbrev_name = "efg" if name == "efg" else name
 
-    plain_formatter = logging.Formatter(
-        "[%(asctime)s] %(name)s %(levelname)s: %(message)s", datefmt="%m/%d %H:%M:%S"
-    )
+    plain_formatter = logging.Formatter("[%(asctime)s] %(name)s %(levelname)s: %(message)s", datefmt="%m/%d %H:%M:%S")
     # stdout logging: master only
     if distributed_rank == 0:
         ch = logging.StreamHandler(stream=sys.stdout)
@@ -239,7 +235,6 @@ def create_table_with_header(header_dict, headers=["category", "AP"], min_cols=6
     result_pair = [x for pair in header_dict.items() for x in pair]
     row_pair = itertools.zip_longest(*[result_pair[i::num_cols] for i in range(num_cols)])
     table = tabulate(
-        row_pair, tablefmt="pipe", floatfmt=".3f",
-        headers=headers * (num_cols // len(headers)),
-        numalign="left")
+        row_pair, tablefmt="pipe", floatfmt=".3f", headers=headers * (num_cols // len(headers)), numalign="left"
+    )
     return table

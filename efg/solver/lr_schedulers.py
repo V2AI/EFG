@@ -31,7 +31,7 @@ def _get_warmup_factor_at_iter(method: str, iter: int, warmup_iters: int, warmup
         alpha = iter / warmup_iters
         return warmup_factor * (1 - alpha) + alpha
     elif method == "burnin":
-        return (iter / warmup_iters)**4
+        return (iter / warmup_iters) ** 4
     else:
         raise ValueError("Unknown warmup method: {}".format(method))
 
@@ -74,7 +74,7 @@ class WarmupMultiStepLR(_LRScheduler):
             self.warmup_method, self.last_epoch, self.warmup_iters, self.warmup_factor
         )
         return [
-            base_lr * warmup_factor * self.gamma**bisect_right(self.milestones, self.last_epoch)
+            base_lr * warmup_factor * self.gamma ** bisect_right(self.milestones, self.last_epoch)
             for base_lr in self.base_lrs
         ]
 
@@ -143,55 +143,55 @@ class WarmupCosineAnnealingLR(_LRScheduler):
 
     def get_lr(self):
         if not self._get_lr_called_within_step:
-            warnings.warn("To get the last learning rate computed by the scheduler, "
-                          "please use `get_last_lr()`.", UserWarning)
+            warnings.warn(
+                "To get the last learning rate computed by the scheduler, " "please use `get_last_lr()`.", UserWarning
+            )
 
         if self.last_epoch == 0:
             return [self.warmup_factor * base_lr for base_lr in self.base_lrs]
         elif self.last_epoch < self.T_warmup:
             warmup_factor = _get_warmup_factor_at_iter(
-                self.warmup_method, self.last_epoch, self.T_warmup, self.warmup_factor)
+                self.warmup_method, self.last_epoch, self.T_warmup, self.warmup_factor
+            )
             return [
-                group['lr'] + (base_lr - base_lr * warmup_factor) / (self.T_warmup - 1)
+                group["lr"] + (base_lr - base_lr * warmup_factor) / (self.T_warmup - 1)
                 for base_lr, group in zip(self.base_lrs, self.optimizer.param_groups)
             ]
         elif (self.last_epoch - 1 - self.T_max) % (2 * (self.T_max - self.T_warmup)) == 0:
             return [
-                group['lr'] + (base_lr - self.eta_min) * (1 - math.cos(math.pi / (self.T_max - self.T_warmup))) / 2
+                group["lr"] + (base_lr - self.eta_min) * (1 - math.cos(math.pi / (self.T_max - self.T_warmup))) / 2
                 for base_lr, group in zip(self.base_lrs, self.optimizer.param_groups)
             ]
         return [
-            (
-                1 + math.cos(
-                    math.pi * (self.last_epoch - self.T_warmup) / (self.T_max - self.T_warmup)
-                )
-            ) / (
-                1 + math.cos(
-                    math.pi * (self.last_epoch - self.T_warmup - 1) / (self.T_max - self.T_warmup)
-                )
-            ) * (group['lr'] - self.eta_min) + self.eta_min
-            for group in self.optimizer.param_groups]
+            (1 + math.cos(math.pi * (self.last_epoch - self.T_warmup) / (self.T_max - self.T_warmup)))
+            / (1 + math.cos(math.pi * (self.last_epoch - self.T_warmup - 1) / (self.T_max - self.T_warmup)))
+            * (group["lr"] - self.eta_min)
+            + self.eta_min
+            for group in self.optimizer.param_groups
+        ]
 
     def _get_closed_form_lr(self):
         """Called when epoch is passed as a param to the `step` function of the scheduler."""
         if self.last_epoch < self.T_warmup:
             warmup_factor = _get_warmup_factor_at_iter(
-                self.warmup_method, self.last_epoch, self.T_warmup, self.warmup_factor)
+                self.warmup_method, self.last_epoch, self.T_warmup, self.warmup_factor
+            )
 
             return [
                 base_lr * warmup_factor + self.last_epoch * (base_lr - base_lr * warmup_factor) / (self.T_warmup - 1)
                 for base_lr in self.base_lrs
             ]
         return [
-            self.eta_min + (base_lr - self.eta_min) *
-            (1 + math.cos(math.pi * (self.last_epoch - self.T_warmup) / (self.T_max - self.T_warmup))) / 2
+            self.eta_min
+            + (base_lr - self.eta_min)
+            * (1 + math.cos(math.pi * (self.last_epoch - self.T_warmup) / (self.T_max - self.T_warmup)))
+            / 2
             for base_lr in self.base_lrs
         ]
 
 
 @LR_SCHEDULERS.register()
 class WarmupCosineAnnealing:
-
     @staticmethod
     def build(config, optimizer):
         sconfig = config.solver.lr_scheduler
@@ -203,7 +203,6 @@ class WarmupCosineAnnealing:
 
 @LR_SCHEDULERS.register()
 class OneCycle:
-
     @staticmethod
     def build(config, optimizer):
         max_lr = config.solver.optimizer.lr

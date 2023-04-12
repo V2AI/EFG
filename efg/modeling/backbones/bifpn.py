@@ -55,7 +55,7 @@ def build_resnet_bifpn_backbone(cfg, input_shape):
         norm,
         bn_momentum,
         bn_eps,
-        memory_efficient
+        memory_efficient,
     )
 
     return bifpn
@@ -68,8 +68,7 @@ class BiFPNLayer(nn.Module):
     See: https://arxiv.org/pdf/1911.09070.pdf for more details.
     """
 
-    def __init__(self, input_size, in_channels_list, out_channels,
-                 fuse_type="fast", norm="BN", memory_efficient=True):
+    def __init__(self, input_size, in_channels_list, out_channels, fuse_type="fast", norm="BN", memory_efficient=True):
         """
         input_size (int): the input image size.
         in_channels_list (list): the number of input tensor channels per level.
@@ -82,8 +81,9 @@ class BiFPNLayer(nn.Module):
         memory_efficient (bool): use `MemoryEfficientSwish` or `Swish` as activation function.
         """
         super(BiFPNLayer, self).__init__()
-        assert fuse_type in ("fast", "softmax", "sum"), f"Unknown fuse method: {fuse_type}." \
-            " Please select in [fast, sotfmax, sum]."
+        assert fuse_type in ("fast", "softmax", "sum"), (
+            f"Unknown fuse method: {fuse_type}." " Please select in [fast, sotfmax, sum]."
+        )
 
         self.input_size = input_size
         self.in_channels_list = in_channels_list
@@ -99,10 +99,7 @@ class BiFPNLayer(nn.Module):
             [3, 5, 10],
             [4, 11],
         ]
-        self.nodes_strides = [
-            2 ** x
-            for x in [6, 5, 4, 3, 4, 5, 6, 7]
-        ]
+        self.nodes_strides = [2**x for x in [6, 5, 4, 3, 4, 5, 6, 7]]
 
         # Change input feature map to have target number of channels.
         self.resample_convs = nn.ModuleList()
@@ -158,14 +155,15 @@ class BiFPNLayer(nn.Module):
 
         self.act = MemoryEfficientSwish() if memory_efficient else Swish()
         self.down_sampling = MaxPool2d(kernel_size=3, stride=2, padding="SAME")
-        self.up_sampling = nn.Upsample(scale_factor=2, mode='nearest')
+        self.up_sampling = nn.Upsample(scale_factor=2, mode="nearest")
 
     def forward(self, inputs):
         assert len(inputs) == self.levels
         # Build top-down and bottom-up path
         self.nodes_features = inputs
         for node_idx, (node_i_input_offsets, node_i_stride) in enumerate(
-                zip(self.nodes_input_offsets, self.nodes_strides)):
+            zip(self.nodes_input_offsets, self.nodes_strides)
+        ):
             # edge weights
             if self.fuse_type == "fast":
                 weights_i = F.relu(self.edge_weights[node_idx])
@@ -209,9 +207,20 @@ class BiFPN(Backbone):
     See: https://arxiv.org/pdf/1911.09070.pdf for more details.
     """
 
-    def __init__(self, input_size, bottom_up, in_features, out_channels, num_bifpn_layers,
-                 fuse_type="weighted_sum", top_block=None, norm="BN", bn_momentum=0.01, bn_eps=1e-3,
-                 memory_efficient=True):
+    def __init__(
+        self,
+        input_size,
+        bottom_up,
+        in_features,
+        out_channels,
+        num_bifpn_layers,
+        fuse_type="weighted_sum",
+        top_block=None,
+        norm="BN",
+        bn_momentum=0.01,
+        bn_eps=1e-3,
+        memory_efficient=True,
+    ):
         """
         input_size (int): the input image size.
         bottom_up (Backbone): module representing the bottom up subnetwork.
@@ -271,8 +280,9 @@ class BiFPN(Backbone):
                 bifpn_layer_in_channels = in_channels + [out_channels] * self.top_block.num_levels
             else:
                 bifpn_layer_in_channels = [out_channels] * len(self._out_features)
-            bifpn_layer = BiFPNLayer(input_size, bifpn_layer_in_channels,
-                                     out_channels, fuse_type, norm, memory_efficient)
+            bifpn_layer = BiFPNLayer(
+                input_size, bifpn_layer_in_channels, out_channels, fuse_type, norm, memory_efficient
+            )
             self.bifpn_layers.append(bifpn_layer)
 
         self._size_divisibility = in_strides[-1]
@@ -287,7 +297,7 @@ class BiFPN(Backbone):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 fan_in = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
-                stddev = math.sqrt(1. / max(1., fan_in))
+                stddev = math.sqrt(1.0 / max(1.0, fan_in))
                 m.weight.data.normal_(0, stddev)
                 if m.bias is not None:
                     m.bias.data.zero_()
@@ -338,7 +348,7 @@ class BiFPNP6P7(nn.Module):
             stride=1,
             padding=0,
             norm=get_norm(norm, out_channels),
-            activation=None
+            activation=None,
         )
         self.down_sampling = MaxPool2d(kernel_size=3, stride=2, padding="SAME")
 

@@ -192,7 +192,6 @@ def _get_available_frames(root, split):
 
 
 def create_waymo_infos(root_path, split="train", nsweeps=1):
-
     frames = _get_available_frames(root_path, split)
 
     waymo_infos = _fill_infos(root_path, frames, split, nsweeps)
@@ -249,13 +248,9 @@ def create_groundtruth_database(
         test_mode = False
 
     if db_path is None:
-        db_path = os.path.join(
-            root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled"
-        )
+        db_path = os.path.join(root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled")
     if dbinfo_path is None:
-        dbinfo_path = os.path.join(
-            root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled_infos.pkl"
-        )
+        dbinfo_path = os.path.join(root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled_infos.pkl")
     if not os.path.exists(db_path):
         os.makedirs(db_path)
 
@@ -272,7 +267,6 @@ def create_groundtruth_database(
     splits = np.linspace(0, num_infos, num=11).astype(np.int64)
     split_s, split_e = 0, 1
     for index in tqdm(range(len(dataset_infos_all))):
-
         if index >= splits[split_s] and index < splits[split_e]:
             db_prefix = str(split_s)
         else:
@@ -335,7 +329,6 @@ def create_groundtruth_database(
 
         for i in range(num_obj):
             if (used_classes is None) or names[i] in used_classes:
-
                 gt_points = points[point_indices[:, i]]
                 gt_points[:, :3] -= gt_boxes[i, :3]
 

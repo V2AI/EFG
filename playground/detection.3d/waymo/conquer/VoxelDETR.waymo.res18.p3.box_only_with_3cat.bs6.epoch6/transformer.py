@@ -28,7 +28,6 @@ class Transformer(nn.Module):
         self.decoder = TransformerDecoder(d_model, decoder_layer, num_decoder_layers)
 
     def _create_ref_windows(self, tensor_list):
-
         device = tensor_list[0].device
 
         ref_windows = []
@@ -44,9 +43,9 @@ class Transformer(nn.Module):
             ref_xy = torch.stack((ref_x, ref_y), -1)
             ref_wh = torch.ones_like(ref_xy) * 0.025
             placeholder = torch.zeros_like(ref_xy)[..., :1]
-            ref_box = torch.cat(
-                (ref_xy, placeholder + 0.5, ref_wh, placeholder + 0.5, placeholder), -1
-            ).expand(B, -1, -1)
+            ref_box = torch.cat((ref_xy, placeholder + 0.5, ref_wh, placeholder + 0.5, placeholder), -1).expand(
+                B, -1, -1
+            )
             ref_windows.append(ref_box)
         ref_windows = torch.cat(ref_windows, dim=1)
 
@@ -62,10 +61,13 @@ class Transformer(nn.Module):
         indexes = indexes.unsqueeze(-1)
 
         out_ref_windows = torch.gather(out_ref_windows, 1, indexes.expand(-1, -1, out_ref_windows.shape[-1]))
-        out_ref_windows = torch.cat((
-            out_ref_windows.detach(),
-            topk_probs.detach().expand(-1, -1, 3),
-        ), dim=-1)
+        out_ref_windows = torch.cat(
+            (
+                out_ref_windows.detach(),
+                topk_probs.detach().expand(-1, -1, 3),
+            ),
+            dim=-1,
+        )
 
         out_pos = None
         # out_embed = torch.gather(enc_embed, 1, indexes.expand(-1, -1, enc_embed.shape[-1]))
@@ -116,7 +118,6 @@ class TransformerEncoderLayer(nn.Module):
         return tensor if pos is None else tensor + pos
 
     def forward(self, src, pos, src_shape, src_start_idx, ref_windows):
-
         src2 = self.self_attn(
             self.with_pos_embed(src, pos),
             src,
@@ -174,9 +175,7 @@ class TransformerDecoderLayer(nn.Module):
     def with_pos_embed(tensor, pos):
         return tensor if pos is None else tensor + pos
 
-    def forward(
-        self, idx, query, query_pos, memory, memory_shape, memory_start_idx, ref_windows
-    ):
+    def forward(self, idx, query, query_pos, memory, memory_shape, memory_start_idx, ref_windows):
         if idx == 0:
             query = self.pos_embed_layer(ref_windows)
             q = k = query
@@ -219,9 +218,7 @@ class TransformerDecoder(nn.Module):
 
         self.layers = get_clones(decoder_layer, num_layers)
 
-    def forward(
-        self, query, query_pos, memory, memory_shape, memory_start_idx, ref_windows
-    ):
+    def forward(self, query, query_pos, memory, memory_shape, memory_start_idx, ref_windows):
         output = query
         intermediate = []
         intermediate_ref_windows = []
@@ -229,10 +226,13 @@ class TransformerDecoder(nn.Module):
             output = layer(idx, output, query_pos, memory, memory_shape, memory_start_idx, ref_windows)
             new_ref_logits, new_ref_windows = self.detection_head(output, ref_windows[..., :7], idx)
             new_ref_probs = new_ref_logits.sigmoid()  # .max(dim=-1, keepdim=True).values
-            ref_windows = torch.cat((
-                new_ref_windows.detach(),
-                new_ref_probs.detach(),
-            ), dim=-1)
+            ref_windows = torch.cat(
+                (
+                    new_ref_windows.detach(),
+                    new_ref_probs.detach(),
+                ),
+                dim=-1,
+            )
             intermediate.append(output)
             intermediate_ref_windows.append(new_ref_windows)
         return torch.stack(intermediate), torch.stack(intermediate_ref_windows)

@@ -6,7 +6,7 @@ import torch.nn as nn
 
 
 class Mlp1d(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.0):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
@@ -25,7 +25,7 @@ class Mlp1d(nn.Module):
 
 
 class Mlp2d(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.0):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
@@ -54,8 +54,8 @@ class LayerNorm2d(nn.Module):
             self.weight = nn.Parameter(torch.zeros(1, channels, 1, 1))
             self.bias = nn.Parameter(torch.zeros(1, channels, 1, 1))
         else:
-            self.register_parameter('weight', None)
-            self.register_parameter('bias', None)
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -72,8 +72,7 @@ class LayerNorm2d(nn.Module):
         return out
 
     def extra_repr(self):
-        return '{channels}, eps={eps}, ' \
-            'elementwise_affine={elementwise_affine}'.format(**self.__dict__)
+        return "{channels}, eps={eps}, " "elementwise_affine={elementwise_affine}".format(**self.__dict__)
 
 
 class LayerNorm1d(nn.Module):
@@ -87,8 +86,8 @@ class LayerNorm1d(nn.Module):
             self.weight = nn.Parameter(torch.zeros(1, channels, 1))
             self.bias = nn.Parameter(torch.zeros(1, channels, 1))
         else:
-            self.register_parameter('weight', None)
-            self.register_parameter('bias', None)
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -105,19 +104,18 @@ class LayerNorm1d(nn.Module):
         return out
 
     def extra_repr(self):
-        return '{channels}, eps={eps}, ' \
-            'elementwise_affine={elementwise_affine}'.format(**self.__dict__)
+        return "{channels}, eps={eps}, " "elementwise_affine={elementwise_affine}".format(**self.__dict__)
 
 
 class Attention2d(nn.Module):
-    def __init__(self, dim, out_dim=None, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+    def __init__(self, dim, out_dim=None, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0.0, proj_drop=0.0):
         super().__init__()
 
         out_dim = dim if out_dim is None else out_dim
         self.num_heads = num_heads
         head_dim = out_dim // num_heads
         # NOTE scale factor was wrong in my original version, can set manually to be compat with prev weights
-        self.scale = qk_scale or head_dim ** -0.5
+        self.scale = qk_scale or head_dim**-0.5
 
         self.qkv = nn.Conv2d(dim, out_dim * 3, kernel_size=1, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
@@ -129,9 +127,9 @@ class Attention2d(nn.Module):
     def forward(self, x):
         B, C, H, W = x.shape
         qkv = self.qkv(x).flatten(-2)  # BCHW -> B(3C)N
-        qkv = qkv.reshape(
-            B, 3, self.num_heads, self.out_dim // self.num_heads, H * W
-        ).permute(1, 0, 2, 4, 3)  # B(3C)N -> B3H(C/H)N -> 3BHN(C/H)
+        qkv = qkv.reshape(B, 3, self.num_heads, self.out_dim // self.num_heads, H * W).permute(
+            1, 0, 2, 4, 3
+        )  # B(3C)N -> B3H(C/H)N -> 3BHN(C/H)
         q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple), each BHN(C/H)
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)

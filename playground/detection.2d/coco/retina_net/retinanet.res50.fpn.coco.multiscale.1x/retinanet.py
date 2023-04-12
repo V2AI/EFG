@@ -1,26 +1,27 @@
 import logging
 import math
-from easydict import EasyDict as edict
 from typing import List
+
+from omegaconf import OmegaConf
 
 import torch
 from torch import nn
-from omegaconf import OmegaConf
 
 from efg.data.structures.boxes import Boxes, cat, pairwise_iou
 from efg.data.structures.image_list import ImageList
 from efg.data.structures.instances import Instances
 from efg.data.structures.shape_spec import ShapeSpec
-from efg.modeling.assigners.box_regression import Box2BoxTransform
 from efg.modeling.assigners.anchor_generator import DefaultAnchorGenerator
+from efg.modeling.assigners.box_regression import Box2BoxTransform
 from efg.modeling.backbones.backbone import Backbone
-from efg.modeling.post_processing.postprocessing import detector_postprocess
+from efg.modeling.backbones.fpn import build_retinanet_resnet_fpn_backbone
 from efg.modeling.losses.focal_loss import sigmoid_focal_loss_jit
 from efg.modeling.losses.smooth_l1_loss import smooth_l1_loss
-from efg.modeling.backbones.fpn import build_retinanet_resnet_fpn_backbone
-from efg.utils.logger import log_first_n
 from efg.modeling.operators.nms import generalized_batched_nms
+from efg.modeling.post_processing.postprocessing import detector_postprocess
+from efg.utils.logger import log_first_n
 
+from easydict import EasyDict as edict
 from matcher import Matcher
 
 
@@ -73,7 +74,6 @@ def build_backbone(config, input_shape=None):
 
 
 def build_anchor_generator(config, input_shape):
-
     return DefaultAnchorGenerator(edict(OmegaConf.to_container(config.model.anchor_generator)), input_shape)
 
 
@@ -266,8 +266,7 @@ class RetinaNet(nn.Module):
                 # Anchors with label -1 are ignored.
                 gt_classes_i[anchor_labels == -1] = -1
             else:
-                gt_classes_i = torch.zeros_like(
-                    gt_matched_idxs) + self.num_classes
+                gt_classes_i = torch.zeros_like(gt_matched_idxs) + self.num_classes
                 gt_anchors_reg_deltas_i = torch.zeros_like(anchors_per_image.tensor)
 
             gt_classes.append(gt_classes_i)
@@ -360,9 +359,13 @@ class RetinaNet(nn.Module):
         boxes_all, scores_all, class_idxs_all = [cat(x) for x in [boxes_all, scores_all, class_idxs_all]]
 
         keep = generalized_batched_nms(
-            boxes_all, scores_all, class_idxs_all, self.nms_threshold, nms_type=self.nms_type,
+            boxes_all,
+            scores_all,
+            class_idxs_all,
+            self.nms_threshold,
+            nms_type=self.nms_type,
         )
-        keep = keep[:self.max_detections_per_image]
+        keep = keep[: self.max_detections_per_image]
 
         result = Instances(image_size)
         result.pred_boxes = Boxes(boxes_all[keep])
@@ -416,8 +419,9 @@ class RetinaNetHead(nn.Module):
         num_convs = config.model.retinanet.num_convs
         prior_prob = config.model.retinanet.prior_prob
         num_anchors = build_anchor_generator(config, input_shape).num_cell_anchors
-        assert len(set(num_anchors)) == 1, \
-            "Using different number of anchors between levels is not currently supported!"
+        assert (
+            len(set(num_anchors)) == 1
+        ), "Using different number of anchors between levels is not currently supported!"
         num_anchors = num_anchors[0]
 
         cls_subnet = []

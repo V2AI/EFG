@@ -220,9 +220,7 @@ def _get_coco_panoptic_separated_meta():
 
     # 54 names for COCO stuff categories (including "things")
     stuff_classes = ["things"] + [
-        k["name"].replace("-other", "").replace("-merged", "")
-        for k in COCO_CATEGORIES
-        if k["isthing"] == 0
+        k["name"].replace("-other", "").replace("-merged", "") for k in COCO_CATEGORIES if k["isthing"] == 0
     ]
 
     # NOTE: I randomly picked a color for things

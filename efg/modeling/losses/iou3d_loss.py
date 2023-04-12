@@ -23,18 +23,24 @@ def box_center_to_corners(b):
     dy = 0.5 * h
     c = c + 1e-5
     s = s + 1e-5
-    cos = c / ((c ** 2 + s ** 2).sqrt() + 1e-10)
-    sin = s / ((c ** 2 + s ** 2).sqrt() + 1e-10)
+    cos = c / ((c**2 + s**2).sqrt() + 1e-10)
+    sin = s / ((c**2 + s**2).sqrt() + 1e-10)
 
     dxcos = dx * cos
     dxsin = dx * sin
     dycos = dy * cos
     dysin = dy * sin
 
-    dxy = [- dxcos + dysin, - dxsin - dycos,
-           dxcos + dysin, dxsin - dycos,
-           dxcos - dysin, dxsin + dycos,
-           - dxcos - dysin, - dxsin + dycos]
+    dxy = [
+        -dxcos + dysin,
+        -dxsin - dycos,
+        dxcos + dysin,
+        dxsin - dycos,
+        dxcos - dysin,
+        dxsin + dycos,
+        -dxcos - dysin,
+        -dxsin + dycos,
+    ]
 
     return center + torch.stack(dxy, dim=-1)  # [N, 8]
 
@@ -55,25 +61,18 @@ def box_corners_to_center(corners):
     x_c = (x0 + x2) / 2
     y_c = (y0 + y2) / 2
 
-    wsin, wcos, hsin, hcos = (y1 - y0,
-                              x1 - x0,
-                              x0 + x1,
-                              y2 + y3)
+    wsin, wcos, hsin, hcos = (y1 - y0, x1 - x0, x0 + x1, y2 + y3)
     theta = torch.atan2(wsin, wcos)
     c = torch.cos(theta)
     s = torch.sin(theta)
 
-    b = [x_c, y_c,
-         (wsin ** 2 + wcos ** 2).sqrt(),
-         (hsin ** 2 + hcos ** 2).sqrt(),
-         c, s]
+    b = [x_c, y_c, (wsin**2 + wcos**2).sqrt(), (hsin**2 + hcos**2).sqrt(), c, s]
     return torch.stack(b, dim=-1)
 
 
 def box_area(boxes):
     x0, y0, x1, y1, x2, y2, x3, y3 = boxes.unbind(-1)  # [N,]
-    return ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5 *\
-           ((x3 - x0) ** 2 + (y3 - y0) ** 2) ** 0.5  # [N,]
+    return ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5 * ((x3 - x0) ** 2 + (y3 - y0) ** 2) ** 0.5  # [N,]
 
 
 # looped
@@ -92,9 +91,9 @@ class Line:
         if not isinstance(other, Line):
             return NotImplementedError
         w = self.a * other.b - self.b * other.a
-        return torch.stack([
-            (self.b * other.c - self.c * other.b) / w,
-            (self.c * other.a - self.a * other.c) / w], dim=-1)  # [2,]
+        return torch.stack(
+            [(self.b * other.c - self.c * other.b) / w, (self.c * other.a - self.a * other.c) / w], dim=-1
+        )  # [2,]
 
 
 def box_inter(box1, box2):
@@ -121,8 +120,8 @@ def box_inter(box1, box2):
         line_values = [line(t) for t in intersection]
 
         for s, t, s_value, t_value in zip(
-                intersection, intersection[1:] + intersection[:1],
-                line_values, line_values[1:] + line_values[:1]):
+            intersection, intersection[1:] + intersection[:1], line_values, line_values[1:] + line_values[:1]
+        ):
             if s_value <= 0:
                 new_intersection.append(s)
             if s_value * t_value < 0:
@@ -137,8 +136,7 @@ def box_inter(box1, box2):
     if len(intersection) <= 2:
         return torch.tensor(0, dtype=torch.float).to(box1.device)
 
-    return 0.5 * sum(p[0] * q[1] - p[1] * q[0] for p, q in
-                     zip(intersection, intersection[1:] + intersection[:1]))
+    return 0.5 * sum(p[0] * q[1] - p[1] * q[0] for p, q in zip(intersection, intersection[1:] + intersection[:1]))
 
 
 def box_convex_hull(box1, box2):
@@ -179,8 +177,7 @@ def box_convex_hull(box1, box2):
     # Last point of each list is omitted because it is repeated at the beginning of the other list.
     convex_hull = lower[:-1] + upper[:-1]
 
-    return 0.5 * sum(p[0] * q[1] - p[1] * q[0] for p, q in
-                     zip(convex_hull, convex_hull[1:] + convex_hull[:1]))
+    return 0.5 * sum(p[0] * q[1] - p[1] * q[0] for p, q in zip(convex_hull, convex_hull[1:] + convex_hull[:1]))
 
 
 # vectorized
@@ -199,9 +196,9 @@ class Lines:
         if not isinstance(others, Lines):
             return NotImplementedError
         w = self.a * others.b - self.b * others.a + self.eps
-        inter = torch.stack([
-            (self.b * others.c - self.c * others.b) / w,
-            (self.c * others.a - self.a * others.c) / w], dim=-1)
+        inter = torch.stack(
+            [(self.b * others.c - self.c * others.b) / w, (self.c * others.a - self.a * others.c) / w], dim=-1
+        )
         return inter  # [N, 2]
 
 
@@ -294,7 +291,16 @@ def box_inter_tensor(boxes1, boxes2):
     # vectorized intersection computation
     inter_xy = boxes1.unsqueeze(1).expand(-1, M, -1, -1).reshape([N * M, 4, 2])  # [N * M, 4, 2]
     cut_rect = boxes2.unsqueeze(0).expand(N, -1, -1, -1).reshape([N * M, 4, 2])  # [N * M, 4, 2]
-    sizes = torch.zeros([N * M, ]).to(boxes1.device).long().fill_(4)  # [N, M]
+    sizes = (
+        torch.zeros(
+            [
+                N * M,
+            ]
+        )
+        .to(boxes1.device)
+        .long()
+        .fill_(4)
+    )  # [N, M]
 
     inter_xy, sizes = cuts(inter_xy, sizes, cut_rect[:, 0, :], cut_rect[:, 1, :])  # [N * M, 5, 2]
     inter_xy, sizes = cuts(inter_xy, sizes, cut_rect[:, 1, :], cut_rect[:, 2, :])  # [N * M, 6, 2]
@@ -336,7 +342,16 @@ def box_inter_tensor_diag(boxes1, boxes2):
     # vectorized intersection computation
     inter_xy = boxes1
     cut_rect = boxes2
-    sizes = torch.zeros([N, ], device=boxes1.device).long().fill_(4)
+    sizes = (
+        torch.zeros(
+            [
+                N,
+            ],
+            device=boxes1.device,
+        )
+        .long()
+        .fill_(4)
+    )
 
     # inter_xy = boxes1.unsqueeze(1).expand(-1, M, -1, -1).reshape([N * M, 4, 2])  # [N * M, 4, 2]
     # cut_rect = boxes2.unsqueeze(0).expand(N, -1, -1, -1).reshape([N * M, 4, 2])  # [N * M, 4, 2]
@@ -364,11 +379,11 @@ def box_inter_tensor_diag(boxes1, boxes2):
 
 def box_convex_hull_tensor(boxes1, boxes2):
     """
-       Arguments:
-           boxes1, boxes2 (Tensor[N, 8], Tensor[M, 8]): boxes to compute convex hull area. They are
-               expected to be in (x0, y0, ..., x3, y3) format, where the corners are sorted counterclockwise.
-       Returns:
-           hull (Tensor[N, M]) pairwise matrix, where N = len(boxes1) and M = len(boxes2)
+    Arguments:
+        boxes1, boxes2 (Tensor[N, 8], Tensor[M, 8]): boxes to compute convex hull area. They are
+            expected to be in (x0, y0, ..., x3, y3) format, where the corners are sorted counterclockwise.
+    Returns:
+        hull (Tensor[N, M]) pairwise matrix, where N = len(boxes1) and M = len(boxes2)
     """
 
     N = boxes1.shape[-2]
@@ -398,10 +413,14 @@ def box_convex_hull_tensor(boxes1, boxes2):
 
     for k in range(8):
         while True:
-            mask = (lower_sizes >= 2) & \
-                   (cross(lower[torch.arange(N * M), lower_sizes - 2, :],
-                          lower[torch.arange(N * M), lower_sizes - 1, :],
-                          boxes[:, k, :]) <= 0)
+            mask = (lower_sizes >= 2) & (
+                cross(
+                    lower[torch.arange(N * M), lower_sizes - 2, :],
+                    lower[torch.arange(N * M), lower_sizes - 1, :],
+                    boxes[:, k, :],
+                )
+                <= 0
+            )
             lower_sizes = lower_sizes - mask.long()
             if mask.any():
                 continue
@@ -410,10 +429,14 @@ def box_convex_hull_tensor(boxes1, boxes2):
         lower[torch.arange(N * M), lower_sizes - 1, :] = boxes[:, k, :]
 
         while True:
-            mask = (upper_sizes >= 2) & \
-                   (cross(upper[torch.arange(N * M), upper_sizes - 2, :],
-                          upper[torch.arange(N * M), upper_sizes - 1, :],
-                          boxes[:, 7 - k, :]) <= 0)
+            mask = (upper_sizes >= 2) & (
+                cross(
+                    upper[torch.arange(N * M), upper_sizes - 2, :],
+                    upper[torch.arange(N * M), upper_sizes - 1, :],
+                    boxes[:, 7 - k, :],
+                )
+                <= 0
+            )
             upper_sizes = upper_sizes - mask.long()
             if mask.any():
                 continue
@@ -461,11 +484,11 @@ def box_convex_hull_tensor(boxes1, boxes2):
 
 def box_convex_hull_tensor_diag(boxes1, boxes2):
     """
-       Arguments:
-           boxes1, boxes2 (Tensor[N, 8], Tensor[N, 8]): boxes to compute convex hull area. They are
-               expected to be in (x0, y0, ..., x3, y3) format, where the corners are sorted counterclockwise.
-       Returns:
-           hull (Tensor[N, M]) pairwise matrix, where N = len(boxes1) and N = len(boxes2)
+    Arguments:
+        boxes1, boxes2 (Tensor[N, 8], Tensor[N, 8]): boxes to compute convex hull area. They are
+            expected to be in (x0, y0, ..., x3, y3) format, where the corners are sorted counterclockwise.
+    Returns:
+        hull (Tensor[N, M]) pairwise matrix, where N = len(boxes1) and N = len(boxes2)
     """
 
     assert boxes1.shape[0] == boxes2.shape[0]
@@ -496,10 +519,14 @@ def box_convex_hull_tensor_diag(boxes1, boxes2):
 
     for k in range(8):
         while True:
-            mask = (lower_sizes >= 2) & \
-                   (cross(lower[torch.arange(N), lower_sizes - 2, :],
-                          lower[torch.arange(N), lower_sizes - 1, :],
-                          boxes[:, k, :]) <= 0)
+            mask = (lower_sizes >= 2) & (
+                cross(
+                    lower[torch.arange(N), lower_sizes - 2, :],
+                    lower[torch.arange(N), lower_sizes - 1, :],
+                    boxes[:, k, :],
+                )
+                <= 0
+            )
             lower_sizes = lower_sizes - mask.long()
             if mask.any():
                 continue
@@ -508,10 +535,14 @@ def box_convex_hull_tensor_diag(boxes1, boxes2):
         lower[torch.arange(N), lower_sizes - 1, :] = boxes[:, k, :]
 
         while True:
-            mask = (upper_sizes >= 2) & \
-                   (cross(upper[torch.arange(N), upper_sizes - 2, :],
-                          upper[torch.arange(N), upper_sizes - 1, :],
-                          boxes[:, 7 - k, :]) <= 0)
+            mask = (upper_sizes >= 2) & (
+                cross(
+                    upper[torch.arange(N), upper_sizes - 2, :],
+                    upper[torch.arange(N), upper_sizes - 1, :],
+                    boxes[:, 7 - k, :],
+                )
+                <= 0
+            )
             upper_sizes = upper_sizes - mask.long()
             if mask.any():
                 continue
@@ -630,7 +661,7 @@ def generalized_box_iou3d(boxes1, boxes2):
     zmax2 = boxes2[..., 2] + boxes2[..., 5] * 0.5
     zmin2 = boxes2[..., 2] - boxes2[..., 5] * 0.5
 
-    z_overlap = (torch.min(zmax1, zmax2) - torch.max(zmin1, zmin2)).clamp_min(0.)
+    z_overlap = (torch.min(zmax1, zmax2) - torch.max(zmin1, zmin2)).clamp_min(0.0)
     inter3d = inter * z_overlap
 
     vol1 = boxes1[..., 3:6].prod(dim=-1)

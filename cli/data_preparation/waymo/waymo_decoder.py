@@ -24,18 +24,18 @@ def decode_frame(frame, frame_id):
 
     lidars = extract_points(frame.lasers, frame.context.laser_calibrations, frame.pose)
 
-    frame_name = '{scene_name}_{location}_{time_of_day}_{timestamp}'.format(
+    frame_name = "{scene_name}_{location}_{time_of_day}_{timestamp}".format(
         scene_name=frame.context.name,
         location=frame.context.stats.location,
         time_of_day=frame.context.stats.time_of_day,
-        timestamp=frame.timestamp_micros
+        timestamp=frame.timestamp_micros,
     )
 
     example_data = {
-        'scene_name': frame.context.name,
-        'frame_name': frame_name,
-        'frame_id': frame_id,
-        'lidars': lidars,
+        "scene_name": frame.context.name,
+        "frame_name": frame_name,
+        "frame_id": frame_id,
+        "lidars": lidars,
     }
 
     return example_data
@@ -51,7 +51,7 @@ def decode_annos(frame, frame_id):
     global_from_ref_rotation = ref_pose[:3, :3]
     objects = extract_objects(frame.laser_labels, global_from_ref_rotation)
 
-    frame_name = '{scene_name}_{location}_{time_of_day}_{timestamp}'.format(
+    frame_name = "{scene_name}_{location}_{time_of_day}_{timestamp}".format(
         scene_name=frame.context.name,
         location=frame.context.stats.location,
         time_of_day=frame.context.stats.time_of_day,
@@ -59,11 +59,11 @@ def decode_annos(frame, frame_id):
     )
 
     annos = {
-        'scene_name': frame.context.name,
-        'frame_name': frame_name,
-        'frame_id': frame_id,
-        'veh_to_global': veh_to_global,
-        'objects': objects,
+        "scene_name": frame.context.name,
+        "frame_name": frame_name,
+        "frame_id": frame_id,
+        "veh_to_global": veh_to_global,
+        "objects": objects,
     }
 
     return annos
@@ -72,7 +72,7 @@ def decode_annos(frame, frame_id):
 def extract_points_from_range_image(laser, calibration, frame_pose):
     """Decode points from lidar."""
     if laser.name != calibration.name:
-        raise ValueError('Laser and calibration do not match')
+        raise ValueError("Laser and calibration do not match")
     if laser.name == dataset_pb2.LaserName.TOP:
         frame_pose = tf.convert_to_tensor(np.reshape(np.array(frame_pose.transform), [4, 4]))
         range_image_top_pose = dataset_pb2.MatrixFloat.FromString(
@@ -104,10 +104,7 @@ def extract_points_from_range_image(laser, calibration, frame_pose):
         range_image = dataset_pb2.MatrixFloat.FromString(range_image_str)
         if not calibration.beam_inclinations:
             beam_inclinations = range_image_utils.compute_inclination(
-                tf.constant([
-                    calibration.beam_inclination_min,
-                    calibration.beam_inclination_max
-                ]),
+                tf.constant([calibration.beam_inclination_min, calibration.beam_inclination_max]),
                 height=range_image.shape.dims[0],
             )
         else:
@@ -135,9 +132,7 @@ def extract_points_from_range_image(laser, calibration, frame_pose):
 def extract_points(lasers, laser_calibrations, frame_pose):
     """Extract point clouds."""
     sort_lambda = lambda x: x.name
-    lasers_with_calibration = zip(
-        sorted(lasers, key=sort_lambda), sorted(laser_calibrations, key=sort_lambda)
-    )
+    lasers_with_calibration = zip(sorted(lasers, key=sort_lambda), sorted(laser_calibrations, key=sort_lambda))
     points_xyz = []
     points_feature = []
     points_nlz = []
@@ -148,8 +143,8 @@ def extract_points(lasers, laser_calibrations, frame_pose):
         points_feature.extend(points[..., 3:5].astype(np.float32))
         points_nlz.extend(points[..., 5].astype(np.float32))
     return {
-        'points_xyz': np.asarray(points_xyz),
-        'points_feature': np.asarray(points_feature),
+        "points_xyz": np.asarray(points_xyz),
+        "points_feature": np.asarray(points_feature),
     }
 
 
@@ -187,25 +182,30 @@ def extract_objects(laser_labels, global_from_ref_rotation):
 
         ref_velocity = global_vel_to_ref(speed, global_from_ref_rotation)
 
-        objects.append({
-            'id': object_id,
-            'name': label.id,
-            'label': category_label,
-            'box': np.array([
-                box.center_x,
-                box.center_y,
-                box.center_z,
-                box.length,
-                box.width,
-                box.height,
-                ref_velocity[0],
-                ref_velocity[1],
-                box.heading
-            ], dtype=np.float32),
-            'num_points': num_lidar_points_in_box,
-            'detection_difficulty_level': label.detection_difficulty_level,
-            'combined_difficulty_level': combined_difficulty_level,
-            'global_speed': np.array(speed, dtype=np.float32),
-            'global_accel': np.array(accel, dtype=np.float32),
-        })
+        objects.append(
+            {
+                "id": object_id,
+                "name": label.id,
+                "label": category_label,
+                "box": np.array(
+                    [
+                        box.center_x,
+                        box.center_y,
+                        box.center_z,
+                        box.length,
+                        box.width,
+                        box.height,
+                        ref_velocity[0],
+                        ref_velocity[1],
+                        box.heading,
+                    ],
+                    dtype=np.float32,
+                ),
+                "num_points": num_lidar_points_in_box,
+                "detection_difficulty_level": label.detection_difficulty_level,
+                "combined_difficulty_level": combined_difficulty_level,
+                "global_speed": np.array(speed, dtype=np.float32),
+                "global_accel": np.array(accel, dtype=np.float32),
+            }
+        )
     return objects

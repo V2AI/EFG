@@ -8,9 +8,7 @@ from typing import Callable, Optional
 from urllib import request
 
 
-def download(
-    url: str, dir: str, *, filename: Optional[str] = None, progress: bool = True
-) -> str:
+def download(url: str, dir: str, *, filename: Optional[str] = None, progress: bool = True) -> str:
     """
     Download a file from a given URL to a directory. If file exists, will not
         overwrite the existing file.
@@ -45,9 +43,7 @@ def download(
             def hook(t: tqdm.tqdm) -> Callable[[int, int, Optional[int]], None]:
                 last_b = [0]
 
-                def inner(
-                    b: int, bsize: int, tsize: Optional[int] = None
-                ) -> None:
+                def inner(b: int, bsize: int, tsize: Optional[int] = None) -> None:
                     if tsize is not None:
                         t.total = tsize
                     t.update((b - last_b[0]) * bsize)  # type: ignore
@@ -55,12 +51,8 @@ def download(
 
                 return inner
 
-            with tqdm.tqdm(  # type: ignore
-                unit="B", unit_scale=True, miniters=1, desc=filename, leave=True
-            ) as t:
-                tmp, _ = request.urlretrieve(
-                    url, filename=tmp, reporthook=hook(t)
-                )
+            with tqdm.tqdm(unit="B", unit_scale=True, miniters=1, desc=filename, leave=True) as t:  # type: ignore
+                tmp, _ = request.urlretrieve(url, filename=tmp, reporthook=hook(t))
 
         else:
             tmp, _ = request.urlretrieve(url, filename=tmp)
@@ -80,7 +72,5 @@ def download(
         except IOError:
             pass
 
-    logger.info(
-        "Successfully downloaded " + fpath + ". " + str(size) + " bytes."
-    )
+    logger.info("Successfully downloaded " + fpath + ". " + str(size) + " bytes.")
     return fpath

@@ -58,10 +58,12 @@ class Augmentation(object):
             classname = type(self).__name__
             argstr = []
             for name, param in sig.parameters.items():
-                assert param.kind != param.VAR_POSITIONAL and param.kind != param.VAR_KEYWORD, \
-                    "The default __repr__ doesn't support *args or **kwargs"
-                assert hasattr(self, name), \
-                    f"Attribute {name} not found! Default __repr__ only works if attributes match the constructor."
+                assert (
+                    param.kind != param.VAR_POSITIONAL and param.kind != param.VAR_KEYWORD
+                ), "The default __repr__ doesn't support *args or **kwargs"
+                assert hasattr(
+                    self, name
+                ), f"Attribute {name} not found! Default __repr__ only works if attributes match the constructor."
                 attr = getattr(self, name)
                 default = param.default
                 if default is attr:
@@ -119,7 +121,6 @@ class DatabaseSampling(Augmentation):
         return db_sampler
 
     def __call__(self, points, info):
-
         if self._rand_range() <= self.p:
             sampled_dict = self.db_sampler.sample_all(
                 info["metadata"]["db_path"],
@@ -129,9 +130,9 @@ class DatabaseSampling(Augmentation):
             )
 
             if sampled_dict is not None:
-                for k in ['gt_names', 'gt_boxes']:
+                for k in ["gt_names", "gt_boxes"]:
                     info["annotations"][k] = np.concatenate([info["annotations"][k], sampled_dict[k]], axis=0)
-                for k in ['difficulty', 'num_points_in_gt']:
+                for k in ["difficulty", "num_points_in_gt"]:
                     if k in info["annotations"]:
                         info["annotations"][k] = np.concatenate([info["annotations"][k], sampled_dict[k]], axis=0)
                 info["annotations"]["gt_boxes"] = np.nan_to_num(info["annotations"]["gt_boxes"])
@@ -271,7 +272,6 @@ class GlobalScaling(Augmentation):
 
 @PROCESSORS.register()
 class GlobalTranslation(Augmentation):
-
     def __init__(self, std=[0, 0, 0]):
         super()._init(locals())
 
@@ -378,7 +378,6 @@ class FilterByRangeXY(FilterByRange):
 
 @PROCESSORS.register()
 class RandomCropPoints(Augmentation):
-
     def __init__(self, crop_type, crop_size, pc_range, p=0.5):
         """
         Args:
@@ -434,7 +433,6 @@ class RandomCropPoints(Augmentation):
 
     def __call__(self, points, info):
         if self._rand_range() <= self.p:
-
             h, w = np.array(self.pc_range[3:5]) - np.array(self.pc_range[:2])
 
             self.h, self.w = self.get_crop_size((h, w))
@@ -477,11 +475,14 @@ class RandomCropPoints(Augmentation):
         return points, info
 
     def apply_point_clouds(self, points: np.ndarray, center_offset: np.ndarray) -> np.ndarray:
-
         points[..., :2] -= np.array(self.pc_range[:2])
         crop_range = [self.x0 - self.h / 2, self.y0 - self.w / 2, self.x0 + self.h / 2, self.y0 + self.w / 2]
-        mask = (points[:, 0] > crop_range[0]) & (points[:, 0] < crop_range[2]) & \
-            (points[:, 1] > crop_range[1]) & (points[:, 1] < crop_range[3])
+        mask = (
+            (points[:, 0] > crop_range[0])
+            & (points[:, 0] < crop_range[2])
+            & (points[:, 1] > crop_range[1])
+            & (points[:, 1] < crop_range[3])
+        )
         cropped_points = points[mask]
         cropped_points[:, :2] = self.apply_coords(cropped_points[:, :2] + np.array(self.pc_range[:2]), center_offset)
 

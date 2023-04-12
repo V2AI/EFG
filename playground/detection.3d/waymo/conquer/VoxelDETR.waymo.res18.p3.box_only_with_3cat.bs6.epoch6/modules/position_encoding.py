@@ -53,7 +53,7 @@ class PositionEmbeddingSine(nn.Module):
 
 def build_position_encoding(position_embedding, hidden_dim):
     N_steps = hidden_dim // 2
-    if position_embedding in ('v2', 'sine'):
+    if position_embedding in ("v2", "sine"):
         # TODO find a better way of exposing other arguments
         position_embedding = PositionEmbeddingSine(N_steps, normalize=True)
     else:

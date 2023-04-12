@@ -26,16 +26,18 @@ class SepHead(nn.Module):
             classes, num_conv = self.heads[head]
             fc = Sequential()
             for i in range(num_conv - 1):
-                fc.add(nn.Conv2d(
-                    in_channels, head_conv, kernel_size=final_kernel, stride=1, padding=final_kernel // 2, bias=True
-                ))
+                fc.add(
+                    nn.Conv2d(
+                        in_channels, head_conv, kernel_size=final_kernel, stride=1, padding=final_kernel // 2, bias=True
+                    )
+                )
                 if bn is not None:
                     fc.add(get_norm(bn, head_conv))
                 fc.add(nn.ReLU())
-            fc.add(nn.Conv2d(
-                head_conv, classes, kernel_size=final_kernel, stride=1, padding=final_kernel // 2, bias=True
-            ))
-            if 'hm' in head:
+            fc.add(
+                nn.Conv2d(head_conv, classes, kernel_size=final_kernel, stride=1, padding=final_kernel // 2, bias=True)
+            )
+            if "hm" in head:
                 fc[-1].bias.data.fill_(init_bias)
             else:
                 for m in fc.modules():
@@ -59,7 +61,7 @@ class CenterHead(nn.Module):
         num_classes = [len(t["class_names"]) for t in tasks]
         self.class_names = [t["class_names"] for t in tasks]
         self.code_weights = config.model.head.misc.code_weights
-        self.weight = config.model.head.misc.weight    # weight between hm loss and loc loss
+        self.weight = config.model.head.misc.weight  # weight between hm loss and loc loss
         self.dataset = config.model.head.misc.dataset
 
         self.common_heads = OmegaConf.to_container(config.model.head.misc.common_heads)
@@ -70,7 +72,7 @@ class CenterHead(nn.Module):
         self.criterion = FastFocalLoss()
         self.criterion_reg = RegLoss()
 
-        self.box_n_dim = 9 if 'vel' in config.model.head.misc.common_heads else 7
+        self.box_n_dim = 9 if "vel" in config.model.head.misc.common_heads else 7
         self.use_direction_classifier = False
 
         # Configurable BN
@@ -85,7 +87,7 @@ class CenterHead(nn.Module):
         self.shared_conv = nn.Sequential(
             nn.Conv2d(self.in_channels, share_conv_channel, kernel_size=3, padding=1, bias=True),
             get_norm(self._norm_config, share_conv_channel),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         )
 
         self.tasks = nn.ModuleList()
@@ -115,46 +117,48 @@ class CenterHead(nn.Module):
         rets = []
         for task_id, preds_dict in enumerate(preds_dicts):
             # heatmap focal loss
-            preds_dict['hm'] = self._sigmoid(preds_dict['hm'])
+            preds_dict["hm"] = self._sigmoid(preds_dict["hm"])
             hm_loss = self.criterion(
-                preds_dict['hm'], example['hm'][task_id],
-                example['ind'][task_id],
-                example['mask'][task_id],
-                example['cat'][task_id]
+                preds_dict["hm"],
+                example["hm"][task_id],
+                example["ind"][task_id],
+                example["mask"][task_id],
+                example["cat"][task_id],
             )
-            target_box = example['anno_box'][task_id]
+            target_box = example["anno_box"][task_id]
             # reconstruct the anno_box from multiple reg heads
-            if 'vel' in preds_dict:
-                preds_dict['anno_box'] = torch.cat((
-                    preds_dict['reg'], preds_dict['height'],
-                    preds_dict['dim'], preds_dict['vel'], preds_dict['rot']
-                ), dim=1)
+            if "vel" in preds_dict:
+                preds_dict["anno_box"] = torch.cat(
+                    (preds_dict["reg"], preds_dict["height"], preds_dict["dim"], preds_dict["vel"], preds_dict["rot"]),
+                    dim=1,
+                )
             else:
-                preds_dict['anno_box'] = torch.cat((
-                    preds_dict['reg'], preds_dict['height'],
-                    preds_dict['dim'], preds_dict['rot']
-                ), dim=1)
-                target_box = target_box[..., [0, 1, 2, 3, 4, 5, -2, -1]]    # remove vel target
+                preds_dict["anno_box"] = torch.cat(
+                    (preds_dict["reg"], preds_dict["height"], preds_dict["dim"], preds_dict["rot"]), dim=1
+                )
+                target_box = target_box[..., [0, 1, 2, 3, 4, 5, -2, -1]]  # remove vel target
 
             ret = {}
             # Regression loss for dimension, offset, height, rotation
             box_loss = self.criterion_reg(
-                preds_dict['anno_box'],
-                example['mask'][task_id],
-                example['ind'][task_id],
+                preds_dict["anno_box"],
+                example["mask"][task_id],
+                example["ind"][task_id],
                 target_box,
             )
 
             loc_loss = (box_loss * box_loss.new_tensor(self.code_weights)).sum()
 
             loss = hm_loss + self.weight * loc_loss
-            ret.update({
-                'loss': loss,
-                'hm_loss': hm_loss.detach(),
-                'loc_loss': loc_loss,
-                # 'loc_loss_elem': box_loss.detach(),
-                'num_positive': example['mask'][task_id].float().sum()
-            })
+            ret.update(
+                {
+                    "loss": loss,
+                    "hm_loss": hm_loss.detach(),
+                    "loc_loss": loc_loss,
+                    # 'loc_loss_elem': box_loss.detach(),
+                    "num_positive": example["mask"][task_id].float().sum(),
+                }
+            )
             rets.append(ret)
 
         """convert batch-key to key-batch
@@ -169,24 +173,23 @@ class CenterHead(nn.Module):
 
     @torch.no_grad()
     def predict(self, example, preds_dicts, test_config):
-        """decode, nms, then return the detection result. Additionaly support double flip testing
-        """
+        """decode, nms, then return the detection result. Additionaly support double flip testing"""
         # get loss info
         rets = []
         metas = []
-        double_flip = test_config.get('double_flip', False)
+        double_flip = test_config.get("double_flip", False)
         post_center_range = test_config.post_center_limit_range
         if len(post_center_range) > 0:
             post_center_range = torch.tensor(
                 post_center_range,
-                dtype=preds_dicts[0]['hm'].dtype,
-                device=preds_dicts[0]['hm'].device,
+                dtype=preds_dicts[0]["hm"].dtype,
+                device=preds_dicts[0]["hm"].device,
             )
         for task_id, preds_dict in enumerate(preds_dicts):
             # convert N C H W to N H W C
             for key, val in preds_dict.items():
                 preds_dict[key] = val.permute(0, 2, 3, 1).contiguous()
-            batch_size = preds_dict['hm'].shape[0]
+            batch_size = preds_dict["hm"].shape[0]
             if double_flip:
                 assert batch_size % 4 == 0, print(batch_size)
                 batch_size = int(batch_size / 4)
@@ -210,14 +213,14 @@ class CenterHead(nn.Module):
             else:
                 meta_list = example["metadata"]
                 if double_flip:
-                    meta_list = meta_list[:4 * int(batch_size):4]
+                    meta_list = meta_list[: 4 * int(batch_size) : 4]
 
-            batch_hm = torch.sigmoid(preds_dict['hm'])
-            batch_dim = torch.exp(preds_dict['dim'])
-            batch_rots = preds_dict['rot'][..., 0:1]
-            batch_rotc = preds_dict['rot'][..., 1:2]
-            batch_reg = preds_dict['reg']
-            batch_hei = preds_dict['height']
+            batch_hm = torch.sigmoid(preds_dict["hm"])
+            batch_dim = torch.exp(preds_dict["dim"])
+            batch_rots = preds_dict["rot"][..., 0:1]
+            batch_rotc = preds_dict["rot"][..., 1:2]
+            batch_reg = preds_dict["reg"]
+            batch_hei = preds_dict["height"]
             if double_flip:
                 batch_hm = batch_hm.mean(dim=1)
                 batch_hei = batch_hei.mean(dim=1)
@@ -269,8 +272,8 @@ class CenterHead(nn.Module):
             xs = xs * test_config.out_size_factor * test_config.voxel_size[0] + test_config.pc_range[0]
             ys = ys * test_config.out_size_factor * test_config.voxel_size[1] + test_config.pc_range[1]
 
-            if 'vel' in preds_dict:
-                batch_vel = preds_dict['vel']
+            if "vel" in preds_dict:
+                batch_vel = preds_dict["vel"]
 
                 if double_flip:
                     # flip vy
@@ -287,11 +290,10 @@ class CenterHead(nn.Module):
 
             metas.append(meta_list)
 
-            if test_config.get('per_class_nms', False):
+            if test_config.get("per_class_nms", False):
                 pass
             else:
-                rets.append(
-                    self.post_processing(batch_box_preds, batch_hm, test_config, post_center_range, task_id))
+                rets.append(self.post_processing(batch_box_preds, batch_hm, test_config, post_center_range, task_id))
 
         # Merge branches results
         ret_list = []
@@ -310,22 +312,23 @@ class CenterHead(nn.Module):
                         flag += num_class
                     ret[k] = torch.cat([ret[i][k] for ret in rets])
 
-            ret['metadata'] = metas[0][i]
+            ret["metadata"] = metas[0][i]
             ret_list.append(ret)
 
         results = []
         for res in ret_list:
-            results.append({
-                "scores": res["scores"].detach().cpu(),
-                "labels": (res["label_preds"] + 1).detach().cpu(),
-                "boxes3d": res["box3d_lidar"].detach().cpu(),
-            })
+            results.append(
+                {
+                    "scores": res["scores"].detach().cpu(),
+                    "labels": (res["label_preds"] + 1).detach().cpu(),
+                    "boxes3d": res["box3d_lidar"].detach().cpu(),
+                }
+            )
 
         return results
 
     @torch.no_grad()
-    def post_processing(self, batch_box_preds, batch_hm, test_config,
-                        post_center_range, task_id):
+    def post_processing(self, batch_box_preds, batch_hm, test_config, post_center_range, task_id):
         batch_size = len(batch_hm)
 
         prediction_dicts = []
@@ -336,8 +339,9 @@ class CenterHead(nn.Module):
             scores, labels = torch.max(hm_preds, dim=-1)
 
             score_mask = scores > test_config.score_threshold
-            distance_mask = (box_preds[..., :3] >= post_center_range[:3]).all(1) \
-                & (box_preds[..., :3] <= post_center_range[3:]).all(1)
+            distance_mask = (box_preds[..., :3] >= post_center_range[:3]).all(1) & (
+                box_preds[..., :3] <= post_center_range[3:]
+            ).all(1)
 
             mask = distance_mask & score_mask
 
@@ -347,13 +351,11 @@ class CenterHead(nn.Module):
 
             boxes_for_nms = box_preds[:, [0, 1, 2, 3, 4, 5, -1]]
 
-            if test_config.get('circular_nms', False):
+            if test_config.get("circular_nms", False):
                 centers = boxes_for_nms[:, [0, 1]]
                 boxes = torch.cat([centers, scores.view(-1, 1)], dim=1)
                 selected = _circle_nms(
-                    boxes,
-                    min_radius=test_config.min_radius[task_id],
-                    post_max_size=test_config.nms.nms_post_max_size
+                    boxes, min_radius=test_config.min_radius[task_id], post_max_size=test_config.nms.nms_post_max_size
                 )
             else:
                 selected = box_torch_ops.rotate_nms_pcdet(
@@ -361,18 +363,14 @@ class CenterHead(nn.Module):
                     scores.float(),
                     thresh=test_config.nms.nms_iou_threshold,
                     pre_maxsize=test_config.nms.nms_pre_max_size,
-                    post_max_size=test_config.nms.nms_post_max_size
+                    post_max_size=test_config.nms.nms_post_max_size,
                 )
 
             selected_boxes = box_preds[selected]
             selected_scores = scores[selected]
             selected_labels = labels[selected]
 
-            prediction_dict = {
-                'box3d_lidar': selected_boxes,
-                'scores': selected_scores,
-                'label_preds': selected_labels
-            }
+            prediction_dict = {"box3d_lidar": selected_boxes, "scores": selected_scores, "label_preds": selected_labels}
 
             prediction_dicts.append(prediction_dict)
 

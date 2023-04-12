@@ -6,17 +6,16 @@ from nuscenes.utils.data_classes import Box
 from matplotlib import pyplot as plt
 
 # plt.rcParams['image.cmap'] = 'twilight'
-plt.rcParams['image.cmap'] = 'Greys'
+plt.rcParams["image.cmap"] = "Greys"
 
 
 def view_points(points: np.ndarray, view: np.ndarray, normalize: bool) -> np.ndarray:
-
     assert view.shape[0] <= 4
     assert view.shape[1] <= 4
     assert points.shape[0] == 3
 
     viewpad = np.eye(4)
-    viewpad[:view.shape[0], :view.shape[1]] = view
+    viewpad[: view.shape[0], : view.shape[1]] = view
 
     nbr_points = points.shape[1]
 
@@ -32,7 +31,6 @@ def view_points(points: np.ndarray, view: np.ndarray, normalize: bool) -> np.nda
 
 
 if __name__ == "__main__":
-
     points = np.load("example_data/example_point_cloud.bin.npy")[:, :3].transpose()
     boxes = np.load("example_data/example_point_cloud_boxes.bin.npy")
     gt_boxes = np.load("example_data/example_point_cloud_boxes_gt.bin.npy")
@@ -50,7 +48,7 @@ if __name__ == "__main__":
     ax.scatter(points[0, :], points[1, :], c="0.7", s=0.1)
 
     # Show ego vehicle.
-    ax.plot(0, 0, 'x', color='black')
+    ax.plot(0, 0, "x", color="black")
 
     # Show GT boxes.
     for raw_box in gt_boxes:
@@ -60,9 +58,9 @@ if __name__ == "__main__":
             Quaternion(axis=[0, 0, 1], radians=raw_box[-1]),
             label=1,
             score=1,
-            velocity=(*raw_box[6:8], 0)
+            velocity=(*raw_box[6:8], 0),
         )
-        box.render(ax, view=np.eye(4), colors=('g', 'g', 'g'), linewidth=0.6)
+        box.render(ax, view=np.eye(4), colors=("g", "g", "g"), linewidth=0.6)
 
     # Show EST boxes.
     for raw_box in boxes:
@@ -72,9 +70,9 @@ if __name__ == "__main__":
             Quaternion(axis=[0, 0, 1], radians=raw_box[-1]),
             label=1,
             score=1,
-            velocity=(*raw_box[6:8], 0)
+            velocity=(*raw_box[6:8], 0),
         )
-        box.render(ax, view=np.eye(4), colors=('b', 'b', 'b'), linewidth=0.3)
+        box.render(ax, view=np.eye(4), colors=("b", "b", "b"), linewidth=0.3)
 
     # Limit visible range.
     axes_limit = eval_range + 3  # Slightly bigger to include boxes that extend beyond the range.

@@ -31,9 +31,7 @@ def detect_compute_compatibility(CUDA_HOME, so_file):
     try:
         cuobjdump = os.path.join(CUDA_HOME, "bin", "cuobjdump")
         if os.path.isfile(cuobjdump):
-            output = subprocess.check_output(
-                "'{}' --list-elf '{}'".format(cuobjdump, so_file), shell=True
-            )
+            output = subprocess.check_output("'{}' --list-elf '{}'".format(cuobjdump, so_file), shell=True)
             output = output.decode("utf-8").strip().split("\n")
             sm = []
             for line in output:
@@ -65,15 +63,11 @@ def collect_env_info():
     except ImportError:
         data.append(("efg._C", "failed to import"))
     else:
-        data.append(
-            ("efg", efg.__version__ + " @" + os.path.dirname(efg.__file__))
-        )
+        data.append(("efg", efg.__version__ + " @" + os.path.dirname(efg.__file__)))
         data.append(("efg compiler", _C.get_compiler_version()))
         data.append(("efg CUDA compiler", _C.get_cuda_version()))
         if has_cuda:
-            data.append(
-                ("efg arch flags", detect_compute_compatibility(CUDA_HOME, _C.__file__))
-            )
+            data.append(("efg arch flags", detect_compute_compatibility(CUDA_HOME, _C.__file__)))
 
     data.append(("PyTorch", torch.__version__ + " @" + os.path.dirname(torch.__file__)))
     data.append(("PyTorch debug build", torch.version.debug))

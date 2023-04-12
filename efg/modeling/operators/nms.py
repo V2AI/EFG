@@ -30,8 +30,7 @@ def batched_nms(boxes, scores, idxs, iou_threshold):
     return keep
 
 
-def batched_softnms(boxes, scores, idxs, iou_threshold,
-                    score_threshold=0.001, soft_mode="gaussian"):
+def batched_softnms(boxes, scores, idxs, iou_threshold, score_threshold=0.001, soft_mode="gaussian"):
     assert soft_mode in ["linear", "gaussian"]
     assert boxes.shape[-1] == 4
 
@@ -39,16 +38,14 @@ def batched_softnms(boxes, scores, idxs, iou_threshold,
     # no need to return changed scores
     for id in torch.unique(idxs).cpu().tolist():
         mask = (idxs == id).nonzero(as_tuple=False).view(-1)
-        scores[mask] = softnms(boxes[mask], scores[mask], iou_threshold,
-                               score_threshold, soft_mode)
+        scores[mask] = softnms(boxes[mask], scores[mask], iou_threshold, score_threshold, soft_mode)
 
     keep = (scores > score_threshold).nonzero(as_tuple=False).view(-1)
     keep = keep[scores[keep].argsort(descending=True)]
     return keep
 
 
-def batched_softnms_rotated(boxes, scores, idxs, iou_threshold,
-                            score_threshold=0.001, soft_mode="gaussian"):
+def batched_softnms_rotated(boxes, scores, idxs, iou_threshold, score_threshold=0.001, soft_mode="gaussian"):
     assert soft_mode in ["linear", "gaussian"]
     assert boxes.shape[-1] == 5
 
@@ -56,28 +53,26 @@ def batched_softnms_rotated(boxes, scores, idxs, iou_threshold,
     # no need to return changed scores
     for id in torch.unique(idxs).cpu().tolist():
         mask = (idxs == id).nonzero(as_tuple=False).view(-1)
-        scores[mask] = softnms_rotated(boxes[mask], scores[mask], iou_threshold,
-                                       score_threshold, soft_mode)
+        scores[mask] = softnms_rotated(boxes[mask], scores[mask], iou_threshold, score_threshold, soft_mode)
 
     keep = (scores > score_threshold).nonzero(as_tuple=False).view(-1)
     keep = keep[scores[keep].argsort(descending=True)]
     return keep
 
 
-def generalized_batched_nms(boxes, scores, idxs, iou_threshold,
-                            score_threshold=0.001, nms_type="normal"):
+def generalized_batched_nms(boxes, scores, idxs, iou_threshold, score_threshold=0.001, nms_type="normal"):
     assert boxes.shape[-1] == 4
 
     if nms_type == "normal":
         keep = batched_nms(boxes, scores, idxs, iou_threshold)
     elif nms_type.startswith("softnms"):
-        keep = batched_softnms(boxes, scores, idxs, iou_threshold,
-                               score_threshold=score_threshold,
-                               soft_mode=nms_type.lstrip("softnms-"))
+        keep = batched_softnms(
+            boxes, scores, idxs, iou_threshold, score_threshold=score_threshold, soft_mode=nms_type.lstrip("softnms-")
+        )
     elif nms_type == "cluster":
         keep = batched_clusternms(boxes, scores, idxs, iou_threshold)
     else:
-        raise NotImplementedError("NMS type not implemented: \"{}\"".format(nms_type))
+        raise NotImplementedError('NMS type not implemented: "{}"'.format(nms_type))
 
     return keep
 
@@ -100,7 +95,7 @@ def scale_by_iou(ious, sigma, soft_mode="gaussian"):
         scale = ious.new_ones(ious.size())
         scale[ious >= sigma] = 1 - ious[ious >= sigma]
     else:
-        scale = torch.exp(-ious ** 2 / sigma)
+        scale = torch.exp(-(ious**2) / sigma)
 
     return scale
 
@@ -165,7 +160,7 @@ def cluster_nms(boxes, scores, iou_threshold):
 
     while True:
         iou_matrix = torch.mm(torch.diag(last_keep.float()), origin_iou_matrix)
-        keep = (iou_matrix.max(dim=0)[0] <= iou_threshold)
+        keep = iou_matrix.max(dim=0)[0] <= iou_threshold
 
         if (keep == last_keep).all():
             return idx[keep.nonzero(as_tuple=False)]
@@ -278,12 +273,8 @@ def batched_nms_rotated(boxes, scores, idxs, iou_threshold):
     # which won't handle negative coordinates correctly.
     # Here by using min_coordinate we can make sure the negative coordinates are
     # correctly handled.
-    max_coordinate = (
-        torch.max(boxes[:, 0], boxes[:, 1]) + torch.max(boxes[:, 2], boxes[:, 3]) / 2
-    ).max()
-    min_coordinate = (
-        torch.min(boxes[:, 0], boxes[:, 1]) - torch.min(boxes[:, 2], boxes[:, 3]) / 2
-    ).min()
+    max_coordinate = (torch.max(boxes[:, 0], boxes[:, 1]) + torch.max(boxes[:, 2], boxes[:, 3]) / 2).max()
+    min_coordinate = (torch.min(boxes[:, 0], boxes[:, 1]) - torch.min(boxes[:, 2], boxes[:, 3]) / 2).min()
     offsets = idxs.to(boxes) * (max_coordinate - min_coordinate + 1)
     boxes_for_nms = boxes.clone()  # avoid modifying the original values in boxes
     boxes_for_nms[:, :2] += offsets[:, None]
@@ -318,9 +309,7 @@ def matrix_nms(seg_masks, cate_labels, cate_scores, kernel="gaussian", sigma=2.0
     # union.
     sum_masks_x = sum_masks.expand(n_samples, n_samples)
     # iou.
-    iou_matrix = (
-        inter_matrix / (sum_masks_x + sum_masks_x.transpose(1, 0) - inter_matrix)
-    ).triu(diagonal=1)
+    iou_matrix = (inter_matrix / (sum_masks_x + sum_masks_x.transpose(1, 0) - inter_matrix)).triu(diagonal=1)
     # label_specific matrix.
     cate_labels_x = cate_labels.expand(n_samples, n_samples)
     label_matrix = (cate_labels_x == cate_labels_x.transpose(1, 0)).float().triu(diagonal=1)
@@ -334,8 +323,8 @@ def matrix_nms(seg_masks, cate_labels, cate_scores, kernel="gaussian", sigma=2.0
 
     # matrix nms
     if kernel == "gaussian":
-        decay_matrix = torch.exp(-1 * sigma * (decay_iou ** 2))
-        compensate_matrix = torch.exp(-1 * sigma * (compensate_iou ** 2))
+        decay_matrix = torch.exp(-1 * sigma * (decay_iou**2))
+        compensate_matrix = torch.exp(-1 * sigma * (compensate_iou**2))
         decay_coefficient, _ = (decay_matrix / compensate_matrix).min(0)
     elif kernel == "linear":
         decay_matrix = (1 - decay_iou) / (1 - compensate_iou)

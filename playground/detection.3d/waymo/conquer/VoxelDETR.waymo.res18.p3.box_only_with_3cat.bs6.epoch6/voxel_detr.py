@@ -39,13 +39,15 @@ class VoxelDETR(nn.Module):
         in_channels = self.backbone.num_channels
 
         # build input projection from backbone to transformer
-        self.input_proj = nn.ModuleList([
-            nn.Sequential(
-                nn.Conv2d(in_channels[i], self.hidden_dim, kernel_size=1),
-                nn.GroupNorm(32, self.hidden_dim),
-            )
-            for i in range(len(self.backbone.out_features))
-        ])
+        self.input_proj = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(in_channels[i], self.hidden_dim, kernel_size=1),
+                    nn.GroupNorm(32, self.hidden_dim),
+                )
+                for i in range(len(self.backbone.out_features))
+            ]
+        )
         for module in self.input_proj.modules():
             if isinstance(module, nn.Conv2d):
                 nn.init.xavier_uniform_(module.weight, gain=1)
@@ -89,7 +91,6 @@ class VoxelDETR(nn.Module):
         self.to(self.device)
 
     def forward(self, batched_inputs):
-
         batch_size = len(batched_inputs)
 
         # samples: ['voxels', 'points', 'coordinates', 'num_points_per_voxel', 'num_voxels', 'shape', 'range', 'size']
@@ -97,7 +98,7 @@ class VoxelDETR(nn.Module):
 
         if self.training:
             targets = [bi[1]["annotations"] for bi in batched_inputs]
-            for key in ['gt_boxes', 'difficulty', 'num_points_in_gt', 'labels']:
+            for key in ["gt_boxes", "difficulty", "num_points_in_gt", "labels"]:
                 for i in range(batch_size):
                     targets[i][key] = torch.tensor(targets[i][key], device=self.device)
             targets = [self.box_coder.encode(tgt) for tgt in targets]
@@ -176,9 +177,7 @@ class VoxelDETR(nn.Module):
             def _process_output(indices, bboxes):
                 topk_boxes = indices.div(out_logits.shape[2], rounding_mode="floor")
                 labels = indices % out_logits.shape[2]
-                boxes = torch.gather(
-                    bboxes, 1, topk_boxes.unsqueeze(-1).repeat(1, 1, out_bbox.shape[-1])
-                )
+                boxes = torch.gather(bboxes, 1, topk_boxes.unsqueeze(-1).repeat(1, 1, out_bbox.shape[-1]))
                 return labels + 1, boxes, topk_boxes
 
             scores, topk_indices = torch.topk(out_prob, 300, dim=1, sorted=False)
@@ -203,6 +202,4 @@ class VoxelDETR(nn.Module):
         # this is a workaround to make torchscript happy, as torchscript
         # doesn't support dictionary with non-homogeneous values, such
         # as a dict having both a Tensor and a list.
-        return [
-            {'pred_logits': a, 'pred_boxes': b} for a, b in zip(outputs_class, outputs_coord)
-        ]
+        return [{"pred_logits": a, "pred_boxes": b} for a, b in zip(outputs_class, outputs_coord)]

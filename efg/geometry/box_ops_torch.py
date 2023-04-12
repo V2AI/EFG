@@ -4,7 +4,6 @@ import torch
 
 
 def get_yaw_rotation(yaw):
-
     cos_yaw = torch.cos(yaw)
     sin_yaw = torch.sin(yaw)
 
@@ -17,7 +16,7 @@ def get_yaw_rotation(yaw):
             torch.stack([sin_yaw, cos_yaw, zeros], dim=-1),
             torch.stack([zeros, zeros, ones], dim=-1),
         ],
-        dim=-2
+        dim=-2,
     )
 
     return rot
@@ -34,21 +33,30 @@ def get_rotation_matrix(roll, pitch, yaw):
     ones = torch.ones_like(yaw)
     zeros = torch.zeros_like(yaw)
 
-    r_roll = torch.stack([
-        torch.stack([ones, zeros, zeros], dim=-1),
-        torch.stack([zeros, cos_roll, -1.0 * sin_roll], dim=-1),
-        torch.stack([zeros, sin_roll, cos_roll], dim=-1),
-    ], dim=-2)
-    r_pitch = torch.stack([
-        torch.stack([cos_pitch, zeros, sin_pitch], dim=-1),
-        torch.stack([zeros, ones, zeros], dim=-1),
-        torch.stack([-1.0 * sin_pitch, zeros, cos_pitch], dim=-1),
-    ], dim=-2)
-    r_yaw = torch.stack([
-        torch.stack([cos_yaw, -1.0 * sin_yaw, zeros], dim=-1),
-        torch.stack([sin_yaw, cos_yaw, zeros], dim=-1),
-        torch.stack([zeros, zeros, ones], dim=-1),
-    ], dim=-2)
+    r_roll = torch.stack(
+        [
+            torch.stack([ones, zeros, zeros], dim=-1),
+            torch.stack([zeros, cos_roll, -1.0 * sin_roll], dim=-1),
+            torch.stack([zeros, sin_roll, cos_roll], dim=-1),
+        ],
+        dim=-2,
+    )
+    r_pitch = torch.stack(
+        [
+            torch.stack([cos_pitch, zeros, sin_pitch], dim=-1),
+            torch.stack([zeros, ones, zeros], dim=-1),
+            torch.stack([-1.0 * sin_pitch, zeros, cos_pitch], dim=-1),
+        ],
+        dim=-2,
+    )
+    r_yaw = torch.stack(
+        [
+            torch.stack([cos_yaw, -1.0 * sin_yaw, zeros], dim=-1),
+            torch.stack([sin_yaw, cos_yaw, zeros], dim=-1),
+            torch.stack([zeros, zeros, ones], dim=-1),
+        ],
+        dim=-2,
+    )
 
     return torch.matmul(r_yaw, torch.matmul(r_pitch, r_roll))
 
@@ -107,20 +115,23 @@ def get_upright_3d_box_corners(boxes):
 
     # [N, 8, 3]
     corners = torch.reshape(
-        torch.stack([
-            l2, w2, -h2,
-            -l2, w2, -h2,
-            -l2, -w2, -h2,
-            l2, -w2, -h2,
-            l2, w2, h2,
-            -l2, w2, h2,
-            -l2, -w2, h2,
-            l2, -w2, h2
-        ], axis=-1),
-        (-1, 8, 3)
+        torch.stack(
+            [
+                l2, w2, -h2,
+                -l2, w2, -h2,
+                -l2, -w2, -h2,
+                l2, -w2, -h2,
+                l2, w2, h2,
+                -l2, w2, h2,
+                -l2, -w2, h2,
+                l2, -w2, h2,
+            ],
+            axis=-1,
+        ),
+        (-1, 8, 3),
     )
     # [N, 8, 3]
-    corners = torch.einsum('nij,nkj->nki', rotation, corners) + translation.unsqueeze(-2)
+    corners = torch.einsum("nij,nkj->nki", rotation, corners) + translation.unsqueeze(-2)
 
     return corners
 
@@ -151,11 +162,11 @@ def is_within_box_3d(point, box):
     translation = transform[:, 0:3, 3]
 
     # [N, M, 3]
-    point_in_box_frame = torch.einsum('nj,mij->nmi', point, rotation) + translation
+    point_in_box_frame = torch.einsum("nj,mij->nmi", point, rotation) + translation
     # [N, M, 3]
     point_in_box = torch.logical_and(
         torch.logical_and(point_in_box_frame <= dim * 0.5, point_in_box_frame >= -dim * 0.5),
-        torch.all(torch.not_equal(dim, 0), -1, keepdim=True)
+        torch.all(torch.not_equal(dim, 0), -1, keepdim=True),
     )
     # [N, M]
     point_in_box = torch.prod(point_in_box.to(torch.uint8), dim=-1).to(torch.bool)
@@ -192,7 +203,7 @@ def transform_point(point, from_frame_pose, to_frame_pose):
         Transformed points of shape [..., N, 3] with the same type as point.
     """
     transform = torch.linalg.matmul(torch.linalg.inv(to_frame_pose), from_frame_pose)
-    return torch.einsum('...ij,...nj->...ni', transform[..., 0:3, 0:3], point) + transform[..., 0:3, 3].unsqueeze(-2)
+    return torch.einsum("...ij,...nj->...ni", transform[..., 0:3, 0:3], point) + transform[..., 0:3, 3].unsqueeze(-2)
 
 
 def transform_box(box, from_frame_pose, to_frame_pose):
@@ -208,8 +219,9 @@ def transform_box(box, from_frame_pose, to_frame_pose):
     transform = torch.linalg.matmul(torch.linalg.inv(to_frame_pose), from_frame_pose)
     heading_offset = torch.atan2(transform[..., 1, 0], transform[..., 0, 0])
     heading = box[..., -1] + heading_offset[..., None]
-    center = torch.einsum('...ij,...nj->...ni', transform[..., 0:3, 0:3], box[..., 0:3]) \
-        + transform[..., 0:3, 3].unsqueeze(-2)
+    center = torch.einsum("...ij,...nj->...ni", transform[..., 0:3, 0:3], box[..., 0:3]) + transform[
+        ..., 0:3, 3
+    ].unsqueeze(-2)
 
     return torch.cat([center, box[..., 3:6], heading[..., None]], dim=-1)
 

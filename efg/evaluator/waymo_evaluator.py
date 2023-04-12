@@ -101,18 +101,14 @@ def recursive_copy_to_device(value, non_blocking, device):
     if isinstance(value, (list, tuple)):
         values = []
         for val in value:
-            values.append(
-                recursive_copy_to_device(val, non_blocking=non_blocking, device=device)
-            )
+            values.append(recursive_copy_to_device(val, non_blocking=non_blocking, device=device))
 
         return values if isinstance(value, list) else tuple(values)
 
     if isinstance(value, abc.Mapping):
         device_val: Dict[str, Any] = {}
         for key, val in value.items():
-            device_val[key] = recursive_copy_to_device(
-                val, non_blocking=non_blocking, device=device
-            )
+            device_val[key] = recursive_copy_to_device(val, non_blocking=non_blocking, device=device)
 
         return device_val
 

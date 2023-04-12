@@ -41,17 +41,17 @@ class BatchSampler:
         assert len(indices) == self.total_size
 
         offset = self.num_samples * self.rank
-        indices = indices[offset: offset + self.num_samples]
+        indices = indices[offset : offset + self.num_samples]
         assert len(indices) == self.num_samples
 
         return indices
 
     def _sample(self, num):
         if self._idx + num >= self.num_samples:
-            ret = self._indices[self._idx:].copy()
+            ret = self._indices[self._idx :].copy()
             self._reset()
         else:
-            ret = self._indices[self._idx: self._idx + num]
+            ret = self._indices[self._idx : self._idx + num]
             self._idx += num
         return ret
 
@@ -67,7 +67,6 @@ class BatchSampler:
 
 class DataBaseSampler:
     def __init__(self, db_info_path, groups, min_points=0, difficulty=-1, sample_func="sample"):
-
         self.db_info_path = db_info_path
         self.min_points = min_points
         self.difficulty = difficulty
@@ -81,8 +80,9 @@ class DataBaseSampler:
 
         self.init_db_infos()
 
-    def init_db_infos(self, ):
-
+    def init_db_infos(
+        self,
+    ):
         with open(self.db_info_path, "rb") as f:
             db_infos = pickle.load(f)
 
@@ -90,8 +90,9 @@ class DataBaseSampler:
         new_db_infos = {}
         for name, db_info in db_infos.items():
             new_db_infos[name] = [
-                info for info in db_info if info["num_points_in_gt"] >= self.min_points and
-                info["difficulty"] >= self.difficulty
+                info
+                for info in db_info
+                if info["num_points_in_gt"] >= self.min_points and info["difficulty"] >= self.difficulty
             ]
             logger.info(f"Loading {len(db_info)} -> {len(new_db_infos[name])} {name} database infos.")
         db_infos = new_db_infos
@@ -107,7 +108,6 @@ class DataBaseSampler:
             self._sampler_dict[k] = BatchSampler(v, k)
 
     def sample_all(self, root_path, gt_boxes, gt_names, num_point_features):
-
         sampled_num_dict = {}
         sample_num_per_class = []
 
@@ -185,7 +185,7 @@ class DataBaseSampler:
         valid_mask = np.concatenate([valid_mask, np.ones([sp_boxes.shape[0]], dtype=np.bool_)], axis=0)
         boxes = np.concatenate([gt_boxes, sp_boxes], axis=0).copy()
 
-        sp_boxes_new = boxes[gt_boxes.shape[0]:]
+        sp_boxes_new = boxes[gt_boxes.shape[0] :]
         sp_boxes_bv = center_to_corner_box2d(sp_boxes_new[:, 0:2], sp_boxes_new[:, 3:5], sp_boxes_new[:, -1])
 
         total_bv = np.concatenate([gt_boxes_bv, sp_boxes_bv], axis=0)

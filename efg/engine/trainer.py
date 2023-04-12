@@ -11,7 +11,7 @@ import torch
 from torch.nn.parallel import DistributedDataParallel
 
 from efg.data import build_dataloader, build_dataset
-from efg.engine.hooks import HookBase, IterTimer, Optimization, LRScheduler, PeriodicCheckpoint, PeriodicWriter
+from efg.engine.hooks import HookBase, IterTimer, LRScheduler, Optimization, PeriodicCheckpoint, PeriodicWriter
 from efg.evaluator.evaluator import inference_on_dataset
 from efg.solver import build_optimizer, build_scheduler
 from efg.utils import distributed as comm
@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 class TrainerBase:
-
     def __init__(self):
         self._hooks = []
         self._metrics = {}
@@ -132,7 +131,6 @@ class TrainerBase:
 
 @TRAINERS.register()
 class DefaultTrainer(TrainerBase):
-
     def __init__(self, configuration):
         super(DefaultTrainer, self).__init__()
 
@@ -212,16 +210,17 @@ class DefaultTrainer(TrainerBase):
         all_model_checkpoints = [
             os.path.join(self.config.trainer.output_dir, file)
             for file in PathManager.ls(self.config.trainer.output_dir)
-            if PathManager.isfile(os.path.join(self.config.trainer.output_dir, file)) and
-            file.startswith("model_") and file.endswith(".pth")
+            if PathManager.isfile(os.path.join(self.config.trainer.output_dir, file))
+            and file.startswith("model_")
+            and file.endswith(".pth")
         ]
         all_model_checkpoints = sorted(all_model_checkpoints, key=os.path.getmtime)
 
         if len(all_model_checkpoints) > 0:
             if self.config.model.weights is not None:
-                matched = np.nonzero(np.array(
-                    [pts.endswith(self.config.model.weights.split("/")[-1]) for pts in all_model_checkpoints]
-                ))[0]
+                matched = np.nonzero(
+                    np.array([pts.endswith(self.config.model.weights.split("/")[-1]) for pts in all_model_checkpoints])
+                )[0]
                 if matched.shape[0] > 0:
                     load_path = all_model_checkpoints[matched[0]]
                 else:
@@ -257,7 +256,9 @@ class DefaultTrainer(TrainerBase):
             hooks.append(PeriodicCheckpoint(checkpoint_period))
             # run writers in the end, so that evaluation metrics are written
             window_size = self.config.trainer.window_size
-            writers = [CommonMetricPrinter(self.max_iters, window_size=window_size), ]
+            writers = [
+                CommonMetricPrinter(self.max_iters, window_size=window_size),
+            ]
             hooks.append(PeriodicWriter(writers, period=window_size))
 
         # def test_and_save_results():
@@ -269,7 +270,6 @@ class DefaultTrainer(TrainerBase):
         logger.info(f"Finish hooks setup: {hooks}")
 
     def step(self):
-
         start = time.perf_counter()
 
         try:

@@ -22,7 +22,7 @@ class Box3dAttention(nn.Module):
         self.with_rotation = with_rotation
         self.num_variable = num_variable
         self.kernel_size = kernel_size
-        self.num_point = kernel_size ** 2
+        self.num_point = kernel_size**2
 
         self.linear_box_weight = nn.Parameter(torch.zeros(num_level * num_head * num_variable, d_model))
         self.linear_box_bias = nn.Parameter(torch.zeros(num_head * num_level * num_variable))
@@ -63,9 +63,7 @@ class Box3dAttention(nn.Module):
         B, L = ref_windows.shape[:2]
 
         offset_boxes = F.linear(query, self.linear_box_weight, self.linear_box_bias)
-        offset_boxes = offset_boxes.view(
-            B, L, self.num_head, self.num_level, self.num_variable
-        )
+        offset_boxes = offset_boxes.view(B, L, self.num_head, self.num_level, self.num_variable)
 
         if ref_windows.dim() == 3:
             ref_windows = ref_windows.unsqueeze(2).unsqueeze(3)
@@ -96,9 +94,7 @@ class Box3dAttention(nn.Module):
 
         return grid.contiguous()
 
-    def forward(
-        self, query, value, v_shape, v_mask, v_start_index, v_valid_ratios, ref_windows
-    ):
+    def forward(self, query, value, v_shape, v_mask, v_start_index, v_valid_ratios, ref_windows):
         B, LQ = query.shape[:2]
         LV = value.shape[1]
 

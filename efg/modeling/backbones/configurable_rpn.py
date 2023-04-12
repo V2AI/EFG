@@ -29,14 +29,14 @@ class RPN(nn.Module):
         assert len(self._num_filters) == len(self._layer_nums)
         assert len(self._num_upsample_filters) == len(self._upsample_strides)
 
-        self._upsample_start_idx = len(self._layer_nums) - len(
-            self._upsample_strides)
+        self._upsample_start_idx = len(self._layer_nums) - len(self._upsample_strides)
 
         must_equal_list = []
         for i in range(len(self._upsample_strides)):
             # print(upsample_strides[i])
-            must_equal_list.append(self._upsample_strides[i] / np.prod(
-                self._layer_strides[:i + self._upsample_start_idx + 1]))
+            must_equal_list.append(
+                self._upsample_strides[i] / np.prod(self._layer_strides[: i + self._upsample_start_idx + 1])
+            )
 
         for val in must_equal_list:
             assert val == must_equal_list[0]
@@ -54,7 +54,7 @@ class RPN(nn.Module):
             )
             blocks.append(block)
             if i - self._upsample_start_idx >= 0:
-                stride = (self._upsample_strides[i - self._upsample_start_idx])
+                stride = self._upsample_strides[i - self._upsample_start_idx]
                 if stride > 1:
                     deblock = Sequential(
                         nn.ConvTranspose2d(
@@ -92,7 +92,6 @@ class RPN(nn.Module):
         return factor
 
     def _make_layer(self, inplanes, planes, num_blocks, stride=1):
-
         block = Sequential(
             nn.ZeroPad2d(1),
             nn.Conv2d(inplanes, planes, 3, stride=stride, bias=False),
@@ -102,7 +101,9 @@ class RPN(nn.Module):
 
         for j in range(num_blocks):
             block.add(nn.Conv2d(planes, planes, 3, padding=1, bias=False))
-            block.add(get_norm(self._norm_cfg, planes), )
+            block.add(
+                get_norm(self._norm_cfg, planes),
+            )
             block.add(nn.ReLU())
 
         return block, planes
@@ -139,14 +140,14 @@ class RPNFixBNMom(nn.Module):
         assert len(self._num_filters) == len(self._layer_nums)
         assert len(self._num_upsample_filters) == len(self._upsample_strides)
 
-        self._upsample_start_idx = len(self._layer_nums) - len(
-            self._upsample_strides)
+        self._upsample_start_idx = len(self._layer_nums) - len(self._upsample_strides)
 
         must_equal_list = []
         for i in range(len(self._upsample_strides)):
             # print(upsample_strides[i])
-            must_equal_list.append(self._upsample_strides[i] / np.prod(
-                self._layer_strides[:i + self._upsample_start_idx + 1]))
+            must_equal_list.append(
+                self._upsample_strides[i] / np.prod(self._layer_strides[: i + self._upsample_start_idx + 1])
+            )
 
         for val in must_equal_list:
             assert val == must_equal_list[0]
@@ -164,7 +165,7 @@ class RPNFixBNMom(nn.Module):
             )
             blocks.append(block)
             if i - self._upsample_start_idx >= 0:
-                stride = (self._upsample_strides[i - self._upsample_start_idx])
+                stride = self._upsample_strides[i - self._upsample_start_idx]
                 if stride > 1:
                     deblock = Sequential(
                         nn.ConvTranspose2d(
@@ -202,7 +203,6 @@ class RPNFixBNMom(nn.Module):
         return factor
 
     def _make_layer(self, inplanes, planes, num_blocks, stride=1):
-
         block = Sequential(
             nn.ZeroPad2d(1),
             nn.Conv2d(inplanes, planes, 3, stride=stride, bias=False),

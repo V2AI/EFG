@@ -29,9 +29,7 @@ def box_collision_test(boxes, qboxes, clockwise=True):
     K = qboxes.shape[0]
     ret = np.zeros((N, K), dtype=np.bool_)
     slices = np.array([1, 2, 3, 0])
-    lines_boxes = np.stack(
-        (boxes, boxes[:, slices, :]), axis=2
-    )  # [N, 4, 2(line), 2(xy)]
+    lines_boxes = np.stack((boxes, boxes[:, slices, :]), axis=2)  # [N, 4, 2(line), 2(xy)]
     lines_qboxes = np.stack((qboxes, qboxes[:, slices, :]), axis=2)
     # vec = np.zeros((2,), dtype=boxes.dtype)
     boxes_standup = corner_to_standup_nd_jit(boxes)
@@ -39,13 +37,9 @@ def box_collision_test(boxes, qboxes, clockwise=True):
     for i in range(N):
         for j in range(K):
             # calculate standup first
-            iw = min(boxes_standup[i, 2], qboxes_standup[j, 2]) - max(
-                boxes_standup[i, 0], qboxes_standup[j, 0]
-            )
+            iw = min(boxes_standup[i, 2], qboxes_standup[j, 2]) - max(boxes_standup[i, 0], qboxes_standup[j, 0])
             if iw > 0:
-                ih = min(boxes_standup[i, 3], qboxes_standup[j, 3]) - max(
-                    boxes_standup[i, 1], qboxes_standup[j, 1]
-                )
+                ih = min(boxes_standup[i, 3], qboxes_standup[j, 3]) - max(boxes_standup[i, 1], qboxes_standup[j, 1])
                 if ih > 0:
                     for k in range(4):
                         for L in range(4):
@@ -53,19 +47,11 @@ def box_collision_test(boxes, qboxes, clockwise=True):
                             B = lines_boxes[i, k, 1]
                             C = lines_qboxes[j, L, 0]
                             D = lines_qboxes[j, L, 1]
-                            acd = (D[1] - A[1]) * (C[0] - A[0]) > (C[1] - A[1]) * (
-                                D[0] - A[0]
-                            )
-                            bcd = (D[1] - B[1]) * (C[0] - B[0]) > (C[1] - B[1]) * (
-                                D[0] - B[0]
-                            )
+                            acd = (D[1] - A[1]) * (C[0] - A[0]) > (C[1] - A[1]) * (D[0] - A[0])
+                            bcd = (D[1] - B[1]) * (C[0] - B[0]) > (C[1] - B[1]) * (D[0] - B[0])
                             if acd != bcd:
-                                abc = (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (
-                                    C[0] - A[0]
-                                )
-                                abd = (D[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (
-                                    D[0] - A[0]
-                                )
+                                abc = (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+                                abd = (D[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (D[0] - A[0])
                                 if abc != abd:
                                     ret[i, j] = True  # collision.
                                     break
@@ -126,11 +112,7 @@ def points_in_rbbox(points, rbbox, z_axis=2, origin=(0.5, 0.5, 0.5)):
     return indices
 
 
-def center_to_corner_box3d(centers,
-                           dims,
-                           angles=None,
-                           origin=(0.5, 0.5, 0.5),
-                           axis=2):
+def center_to_corner_box3d(centers, dims, angles=None, origin=(0.5, 0.5, 0.5), axis=2):
     """convert kitti locations, dimensions and angles to corners
     Args:
         centers (float array, shape=[N, 3]): locations in kitti label file.
@@ -167,8 +149,7 @@ def corners_nd(dims, origin=0.5):
             where x0 < x1, y0 < y1, z0 < z1
     """
     ndim = int(dims.shape[1])
-    corners_norm = np.stack(np.unravel_index(np.arange(2**ndim), [2] * ndim),
-                            axis=1).astype(dims.dtype)
+    corners_norm = np.stack(np.unravel_index(np.arange(2**ndim), [2] * ndim), axis=1).astype(dims.dtype)
     # now corners_norm has format: (2d) x0y0, x0y1, x1y0, x1y1
     # (3d) x0y0z0, x0y0z1, x0y1z0, x0y1z1, x1y0z0, x1y0z1, x1y1z0, x1y1z1
     # so need to convert to a format which is convenient to do other computing.
@@ -180,8 +161,7 @@ def corners_nd(dims, origin=0.5):
     elif ndim == 3:
         corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
     corners_norm = corners_norm - np.array(origin, dtype=dims.dtype)
-    corners = dims.reshape([-1, 1, ndim]) * corners_norm.reshape(
-        [1, 2**ndim, ndim])
+    corners = dims.reshape([-1, 1, ndim]) * corners_norm.reshape([1, 2**ndim, ndim])
 
     return corners
 
@@ -208,11 +188,13 @@ def rotation_3d(points, angles):
     ones = np.ones_like(rot_cos)
     zeros = np.zeros_like(rot_cos)
 
-    rot_mat_T = np.stack([
-        [rot_cos, rot_sin, zeros],
-        [-rot_sin, rot_cos, zeros],
-        [zeros, zeros, ones],
-    ])
+    rot_mat_T = np.stack(
+        [
+            [rot_cos, rot_sin, zeros],
+            [-rot_sin, rot_cos, zeros],
+            [zeros, zeros, ones],
+        ]
+    )
 
     return np.einsum("aij,jka->aik", points, rot_mat_T)
 
@@ -226,23 +208,21 @@ def corner_to_surfaces_3d(corners):
         surfaces (float array, [N, 6, 4, 3]):
     """
     # box_corners: [N, 8, 3], must from corner functions in this module
-    surfaces = np.array([
-        [corners[:, 0], corners[:, 1], corners[:, 2], corners[:, 3]],
-        [corners[:, 7], corners[:, 6], corners[:, 5], corners[:, 4]],
-        [corners[:, 0], corners[:, 3], corners[:, 7], corners[:, 4]],
-        [corners[:, 1], corners[:, 5], corners[:, 6], corners[:, 2]],
-        [corners[:, 0], corners[:, 4], corners[:, 5], corners[:, 1]],
-        [corners[:, 3], corners[:, 2], corners[:, 6], corners[:, 7]],
-    ]).transpose([2, 0, 1, 3])
+    surfaces = np.array(
+        [
+            [corners[:, 0], corners[:, 1], corners[:, 2], corners[:, 3]],
+            [corners[:, 7], corners[:, 6], corners[:, 5], corners[:, 4]],
+            [corners[:, 0], corners[:, 3], corners[:, 7], corners[:, 4]],
+            [corners[:, 1], corners[:, 5], corners[:, 6], corners[:, 2]],
+            [corners[:, 0], corners[:, 4], corners[:, 5], corners[:, 1]],
+            [corners[:, 3], corners[:, 2], corners[:, 6], corners[:, 7]],
+        ]
+    ).transpose([2, 0, 1, 3])
     return surfaces
 
 
 @numba.njit
-def _points_count_convex_polygon_3d_jit(points,
-                                        polygon_surfaces,
-                                        normal_vec,
-                                        d,
-                                        num_surfaces=None):
+def _points_count_convex_polygon_3d_jit(points, polygon_surfaces, normal_vec, d, num_surfaces=None):
     """count points in 3d convex polygons.
     Args:
         points: [num_points, 3] array.
@@ -258,25 +238,26 @@ def _points_count_convex_polygon_3d_jit(points,
     max_num_surfaces, max_num_points_of_surface = polygon_surfaces.shape[1:3]
     num_points = points.shape[0]
     num_polygons = polygon_surfaces.shape[0]
-    ret = np.full((num_polygons, ), num_points, dtype=np.int64)
+    ret = np.full((num_polygons,), num_points, dtype=np.int64)
     sign = 0.0
     for i in range(num_points):
         for j in range(num_polygons):
             for k in range(max_num_surfaces):
                 if k > num_surfaces[j]:
                     break
-                sign = (points[i, 0] * normal_vec[j, k, 0] +
-                        points[i, 1] * normal_vec[j, k, 1] +
-                        points[i, 2] * normal_vec[j, k, 2] + d[j, k])
+                sign = (
+                    points[i, 0] * normal_vec[j, k, 0]
+                    + points[i, 1] * normal_vec[j, k, 1]
+                    + points[i, 2] * normal_vec[j, k, 2]
+                    + d[j, k]
+                )
                 if sign >= 0:
                     ret[j] -= 1
                     break
     return ret
 
 
-def points_count_convex_polygon_3d_jit(points,
-                                       polygon_surfaces,
-                                       num_surfaces=None):
+def points_count_convex_polygon_3d_jit(points, polygon_surfaces, num_surfaces=None):
     """check points is in 3d convex polygons.
     Args:
         points: [num_points, 3] array.
@@ -293,12 +274,11 @@ def points_count_convex_polygon_3d_jit(points,
     # num_points = points.shape[0]
     num_polygons = polygon_surfaces.shape[0]
     if num_surfaces is None:
-        num_surfaces = np.full((num_polygons, ), 9999999, dtype=np.int64)
+        num_surfaces = np.full((num_polygons,), 9999999, dtype=np.int64)
     normal_vec, d = surface_equ_3d_jitv2(polygon_surfaces[:, :, :3, :])
     # normal_vec: [num_polygon, max_num_surfaces, 3]
     # d: [num_polygon, max_num_surfaces]
-    return _points_count_convex_polygon_3d_jit(points, polygon_surfaces,
-                                               normal_vec, d, num_surfaces)
+    return _points_count_convex_polygon_3d_jit(points, polygon_surfaces, normal_vec, d, num_surfaces)
 
 
 @numba.njit
@@ -306,8 +286,7 @@ def surface_equ_3d_jitv2(surfaces):
     # polygon_surfaces: [num_polygon, num_surfaces, num_points_of_polygon, 3]
     num_polygon = surfaces.shape[0]
     max_num_surfaces = surfaces.shape[1]
-    normal_vec = np.zeros((num_polygon, max_num_surfaces, 3),
-                          dtype=surfaces.dtype)
+    normal_vec = np.zeros((num_polygon, max_num_surfaces, 3), dtype=surfaces.dtype)
     d = np.zeros((num_polygon, max_num_surfaces), dtype=surfaces.dtype)
     sv0 = surfaces[0, 0, 0] - surfaces[0, 0, 1]
     sv1 = surfaces[0, 0, 0] - surfaces[0, 0, 1]
@@ -323,15 +302,15 @@ def surface_equ_3d_jitv2(surfaces):
             normal_vec[i, j, 1] = sv0[2] * sv1[0] - sv0[0] * sv1[2]
             normal_vec[i, j, 2] = sv0[0] * sv1[1] - sv0[1] * sv1[0]
 
-            d[i, j] = (-surfaces[i, j, 0, 0] * normal_vec[i, j, 0] -
-                       surfaces[i, j, 0, 1] * normal_vec[i, j, 1] -
-                       surfaces[i, j, 0, 2] * normal_vec[i, j, 2])
+            d[i, j] = (
+                -surfaces[i, j, 0, 0] * normal_vec[i, j, 0]
+                - surfaces[i, j, 0, 1] * normal_vec[i, j, 1]
+                - surfaces[i, j, 0, 2] * normal_vec[i, j, 2]
+            )
     return normal_vec, d
 
 
-def points_in_convex_polygon_3d_jit(points,
-                                    polygon_surfaces,
-                                    num_surfaces=None):
+def points_in_convex_polygon_3d_jit(points, polygon_surfaces, num_surfaces=None):
     """check points is in 3d convex polygons.
     Args:
         points: [num_points, 3] array.
@@ -348,20 +327,15 @@ def points_in_convex_polygon_3d_jit(points,
     # num_points = points.shape[0]
     num_polygons = polygon_surfaces.shape[0]
     if num_surfaces is None:
-        num_surfaces = np.full((num_polygons, ), 9999999, dtype=np.int64)
+        num_surfaces = np.full((num_polygons,), 9999999, dtype=np.int64)
     normal_vec, d = surface_equ_3d_jitv2(polygon_surfaces[:, :, :3, :])
     # normal_vec: [num_polygon, max_num_surfaces, 3]
     # d: [num_polygon, max_num_surfaces]
-    return _points_in_convex_polygon_3d_jit(points, polygon_surfaces,
-                                            normal_vec, d, num_surfaces)
+    return _points_in_convex_polygon_3d_jit(points, polygon_surfaces, normal_vec, d, num_surfaces)
 
 
 @numba.njit
-def _points_in_convex_polygon_3d_jit(points,
-                                     polygon_surfaces,
-                                     normal_vec,
-                                     d,
-                                     num_surfaces=None):
+def _points_in_convex_polygon_3d_jit(points, polygon_surfaces, normal_vec, d, num_surfaces=None):
     """check points is in 3d convex polygons.
     Args:
         points: [num_points, 3] array.
@@ -384,9 +358,12 @@ def _points_in_convex_polygon_3d_jit(points,
             for k in range(max_num_surfaces):
                 if k > num_surfaces[j]:
                     break
-                sign = (points[i, 0] * normal_vec[j, k, 0] +
-                        points[i, 1] * normal_vec[j, k, 1] +
-                        points[i, 2] * normal_vec[j, k, 2] + d[j, k])
+                sign = (
+                    points[i, 0] * normal_vec[j, k, 0]
+                    + points[i, 1] * normal_vec[j, k, 1]
+                    + points[i, 2] * normal_vec[j, k, 2]
+                    + d[j, k]
+                )
                 if sign >= 0:
                     ret[i, j] = False
                     break
@@ -408,11 +385,23 @@ def points_in_convex_polygon_jit(points, polygon, clockwise=True):
     num_points = points.shape[0]
     num_polygons = polygon.shape[0]
     if clockwise:
-        vec1 = (polygon - polygon[:, [num_points_of_polygon - 1] +
-                                  list(range(num_points_of_polygon - 1)), :, ])
+        vec1 = (
+            polygon
+            - polygon[
+                :,
+                [num_points_of_polygon - 1] + list(range(num_points_of_polygon - 1)),
+                :,
+            ]
+        )
     else:
-        vec1 = (polygon[:, [num_points_of_polygon - 1] +
-                        list(range(num_points_of_polygon - 1)), :, ] - polygon)
+        vec1 = (
+            polygon[
+                :,
+                [num_points_of_polygon - 1] + list(range(num_points_of_polygon - 1)),
+                :,
+            ]
+            - polygon
+        )
     # vec1: [num_polygon, num_points_of_polygon, 2]
     ret = np.zeros((num_points, num_polygons), dtype=np.bool_)
     success = True
@@ -476,10 +465,10 @@ def mask_boxes_outside_range_bev_z_bound(boxes, limit_range, min_num_corners=8):
     """
     # limit x-y by box centers
     mask1 = (
-        (boxes[:, 0] >= limit_range[0]) &
-        (boxes[:, 0] <= limit_range[3]) &
-        (boxes[:, 1] >= limit_range[1]) &
-        (boxes[:, 1] <= limit_range[4])
+        (boxes[:, 0] >= limit_range[0])
+        & (boxes[:, 0] <= limit_range[3])
+        & (boxes[:, 1] >= limit_range[1])
+        & (boxes[:, 1] <= limit_range[4])
     )
     if boxes.shape[1] > 7:
         boxes = boxes[:, [0, 1, 2, 3, 4, 5, -1]]
@@ -514,13 +503,12 @@ def boxes_to_corners_3d(boxes3d):
                 [-1, -1, 1],
                 [-1, 1, 1],
             )
-        ).astype(boxes3d.dtype) / 2
+        ).astype(boxes3d.dtype)
+        / 2
     )
 
     corners3d = boxes3d[:, None, 3:6] * template[None, :, :]
-    corners3d = rotate_points_along_z(
-        corners3d.reshape(-1, 8, 3), boxes3d[:, 6]
-    ).reshape(-1, 8, 3)
+    corners3d = rotate_points_along_z(corners3d.reshape(-1, 8, 3), boxes3d[:, 6]).reshape(-1, 8, 3)
     corners3d += boxes3d[:, None, :3]
 
     return corners3d
@@ -540,11 +528,7 @@ def rotate_points_along_z(points, angle):
     sina = torch.sin(angle)
     zeros = angle.new_zeros(points.shape[0])
     ones = angle.new_ones(points.shape[0])
-    rot_matrix = (
-        torch.stack([cosa, sina, zeros, -sina, cosa, zeros, zeros, zeros, ones], dim=1)
-        .view(-1, 3, 3)
-        .float()
-    )
+    rot_matrix = torch.stack([cosa, sina, zeros, -sina, cosa, zeros, zeros, zeros, ones], dim=1).view(-1, 3, 3).float()
     points_rot = torch.matmul(points[:, :, :3], rot_matrix)
     points_rot = torch.cat([points_rot, points[:, :, 3:]], dim=-1)
 
@@ -553,12 +537,12 @@ def rotate_points_along_z(points, angle):
 
 def mask_points_by_range(points, pc_range):
     mask = (
-        (points[:, 0] >= pc_range[0]) &
-        (points[:, 0] <= pc_range[3]) &
-        (points[:, 1] >= pc_range[1]) &
-        (points[:, 1] <= pc_range[4]) &
-        (points[:, 2] >= pc_range[2]) &
-        (points[:, 2] <= pc_range[5])
+        (points[:, 0] >= pc_range[0])
+        & (points[:, 0] <= pc_range[3])
+        & (points[:, 1] >= pc_range[1])
+        & (points[:, 1] <= pc_range[4])
+        & (points[:, 2] >= pc_range[2])
+        & (points[:, 2] <= pc_range[5])
     )
 
     return mask
@@ -566,10 +550,10 @@ def mask_points_by_range(points, pc_range):
 
 def mask_points_by_range_bev(points, pc_range):
     mask = (
-        (points[:, 0] >= pc_range[0]) &
-        (points[:, 0] <= pc_range[3]) &
-        (points[:, 1] >= pc_range[1]) &
-        (points[:, 1] <= pc_range[4])
+        (points[:, 0] >= pc_range[0])
+        & (points[:, 0] <= pc_range[3])
+        & (points[:, 1] >= pc_range[1])
+        & (points[:, 1] <= pc_range[4])
     )
     return mask
 

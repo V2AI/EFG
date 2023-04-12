@@ -59,9 +59,7 @@ def launch(main_func, num_gpus_per_machine, num_machines=1, machine_rank=0, dist
         main_func(*args)
 
 
-def _distributed_worker(
-    local_rank, main_func, world_size, num_gpus_per_machine, machine_rank, dist_url, args
-):
+def _distributed_worker(local_rank, main_func, world_size, num_gpus_per_machine, machine_rank, dist_url, args):
     assert torch.cuda.is_available(), "cuda is not available. Please check your installation."
     global_rank = machine_rank * num_gpus_per_machine + local_rank
 
@@ -130,9 +128,7 @@ def slurm_launch(
 
         if num_machines > 1 and dist_url.startswith("file://"):
             logger = logging.getLogger(__name__)
-            logger.warning(
-                "file:// is not a reliable init_method in multi-machine jobs. Prefer tcp://"
-            )
+            logger.warning("file:// is not a reliable init_method in multi-machine jobs. Prefer tcp://")
 
         """Initialize slurm distributed training environment.
 

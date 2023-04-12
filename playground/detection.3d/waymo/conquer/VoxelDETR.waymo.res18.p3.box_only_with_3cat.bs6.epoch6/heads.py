@@ -63,7 +63,7 @@ class Det3DHead(nn.Module):
         if with_metrics:
             # build metrics
             if not isinstance(config.model.metrics, collections.abc.Sequence):
-                metrics = (config.model.metrics, )
+                metrics = (config.model.metrics,)
             else:
                 metrics = config.model.metrics
             module_metrics = {}

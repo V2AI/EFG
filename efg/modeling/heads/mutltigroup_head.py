@@ -83,7 +83,8 @@ class MultiGroupHead(nn.Module):
                     num_dir=num_dirs[task_id],
                     header=False,
                     norm=self.norm_cfg,
-                ))
+                )
+            )
 
     def forward(self, x):
         ret_dicts = []

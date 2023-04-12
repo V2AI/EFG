@@ -37,9 +37,7 @@ def corners_nd(dims, origin=0.5):
     dtype = torch_to_np_dtype(dims.dtype)
     if isinstance(origin, float):
         origin = [origin] * ndim
-    corners_norm = np.stack(
-        np.unravel_index(np.arange(2 ** ndim), [2] * ndim), axis=1
-    ).astype(dtype)
+    corners_norm = np.stack(np.unravel_index(np.arange(2**ndim), [2] * ndim), axis=1).astype(dtype)
     # now corners_norm has format: (2d) x0y0, x0y1, x1y0, x1y1
     # (3d) x0y0z0, x0y0z1, x0y1z0, x0y1z1, x1y0z0, x1y0z1, x1y1z0, x1y1z1
     # so need to convert to a format which is convenient to do other computing.
@@ -52,7 +50,7 @@ def corners_nd(dims, origin=0.5):
         corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
     corners_norm = corners_norm - np.array(origin, dtype=dtype)
     corners_norm = torch.from_numpy(corners_norm).type_as(dims)
-    corners = dims.view(-1, 1, ndim) * corners_norm.view(1, 2 ** ndim, ndim)
+    corners = dims.view(-1, 1, ndim) * corners_norm.view(1, 2**ndim, ndim)
     return corners
 
 
@@ -130,11 +128,7 @@ def rotate_points_along_z(points, angle):
     sina = torch.sin(angle)
     zeros = angle.new_zeros(points.shape[0])
     ones = angle.new_ones(points.shape[0])
-    rot_matrix = torch.stack((
-        cosa, -sina, zeros,
-        sina, cosa, zeros,
-        zeros, zeros, ones
-    ), dim=1).view(-1, 3, 3).float()
+    rot_matrix = torch.stack((cosa, -sina, zeros, sina, cosa, zeros, zeros, zeros, ones), dim=1).view(-1, 3, 3).float()
     points_rot = torch.matmul(points[:, :, 0:3], rot_matrix)
     points_rot = torch.cat((points_rot, points[:, :, 3:]), dim=-1)
     return points_rot
@@ -204,9 +198,7 @@ def center_to_corner_box2d(centers, dims, angles=None, origin=0.5):
 def project_to_image(points_3d, proj_mat):
     points_num = list(points_3d.shape)[:-1]
     points_shape = np.concatenate([points_num, [1]], axis=0).tolist()
-    points_4 = torch.cat(
-        [points_3d, torch.ones(*points_shape).type_as(points_3d)], dim=-1
-    )
+    points_4 = torch.cat([points_3d, torch.ones(*points_shape).type_as(points_3d)], dim=-1)
     # point_2d = points_4 @ tf.transpose(proj_mat, [1, 0])
     point_2d = torch.matmul(points_4, proj_mat.t())
     point_2d_res = point_2d[..., :2] / point_2d[..., 2:3]

@@ -55,7 +55,6 @@ def box_iou_wo_angle(boxes1, boxes2):
 
 
 def generalized_box3d_iou(boxes1, boxes2):
-
     boxes1 = torch.nan_to_num(boxes1)
     boxes2 = torch.nan_to_num(boxes2)
 
@@ -104,9 +103,7 @@ def get_proposal_pos_embed(proposals, hidden_dim):
     pos = []
     for proposal in proposals:
         proposal = proposal[..., None] / dim_t
-        proposal = torch.stack(
-            (proposal[..., 0::2].sin(), proposal[..., 1::2].cos()), dim=-1
-        ).flatten(-2)
+        proposal = torch.stack((proposal[..., 0::2].sin(), proposal[..., 1::2].cos()), dim=-1).flatten(-2)
         pos.append(proposal)
     pos = torch.cat(pos, dim=-1)
 
@@ -151,8 +148,7 @@ def get_batch_size(batch_size):
 
     if batch_size % world_size != 0:
         raise RuntimeError(
-            "Batch size {} must be divisible by number "
-            "of GPUs {} used.".format(batch_size, world_size)
+            "Batch size {} must be divisible by number " "of GPUs {} used.".format(batch_size, world_size)
         )
 
     return batch_size // world_size
@@ -183,25 +179,17 @@ def print_model_parameters(model, writer, return_only=False):
     trained_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     if not return_only:
-        writer.write(
-            "Total Parameters: {}. Trained Parameters: {}".format(
-                total_params, trained_params
-            )
-        )
+        writer.write("Total Parameters: {}. Trained Parameters: {}".format(total_params, trained_params))
     return total_params, trained_params
 
 
-def interpolate(
-    input, size=None, scale_factor=None, mode="nearest", align_corners=None
-):
+def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None):
     """
     Equivalent to nn.functional.interpolate, but with support for empty batch sizes.
     This will eventually be supported natively by PyTorch, and this
     class can go away.
     """
-    return torchvision.ops.misc.interpolate(
-        input, size, scale_factor, mode, align_corners
-    )
+    return torchvision.ops.misc.interpolate(input, size, scale_factor, mode, align_corners)
 
 
 def extract_grid(x, x_mask, boxes, grid_size=15, align_corners=False, roi_align=False):
@@ -216,9 +204,7 @@ def extract_grid(x, x_mask, boxes, grid_size=15, align_corners=False, roi_align=
     B, L = boxes.shape[:2]
     c = x.shape[1]
     if B == 0:
-        return torch.zeros(
-            0, L, grid_size, grid_size, c, device=x.device, dtype=x.dtype
-        )
+        return torch.zeros(0, L, grid_size, grid_size, c, device=x.device, dtype=x.dtype)
 
     grid_size = grid_size * 2 if roi_align else grid_size
 
@@ -357,9 +343,7 @@ def view_with_shape(tensor_flatten, mask_flatten, tensor_shape):
     for i in range(N):
         H, W = tensor_shape[i].tolist()
         if tensor_flatten is not None:
-            tensor2d_list.append(
-                tensor_list[i].view(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-            )
+            tensor2d_list.append(tensor_list[i].view(B, H, W, -1).permute(0, 3, 1, 2).contiguous())
         if mask_flatten is not None:
             mask2d_list.append(mask_list[i].view(B, H, W))
 

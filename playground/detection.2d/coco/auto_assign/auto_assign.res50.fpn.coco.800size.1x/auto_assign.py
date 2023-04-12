@@ -74,15 +74,15 @@ def positive_bag_loss(logits, mask, gaussian_probs):
     weight = (3 * logits).exp() * gaussian_probs * mask
     w = weight / weight.sum(dim=1, keepdim=True).clamp(min=1e-12)
     bag_prob = (w * logits).sum(dim=1)
-    return F.binary_cross_entropy(bag_prob, torch.ones_like(bag_prob), reduction='none')
+    return F.binary_cross_entropy(bag_prob, torch.ones_like(bag_prob), reduction="none")
 
 
 def negative_bag_loss(logits, gamma):
-    return logits**gamma * F.binary_cross_entropy(logits, torch.zeros_like(logits), reduction='none')
+    return logits**gamma * F.binary_cross_entropy(logits, torch.zeros_like(logits), reduction="none")
 
 
 def normal_distribution(x, mu=0, sigma=1):
-    return (-(x - mu)**2 / (2 * sigma**2)).exp()
+    return (-((x - mu) ** 2) / (2 * sigma**2)).exp()
 
 
 def normalize(x):
@@ -193,10 +193,13 @@ class AutoAssign(nn.Module):
         positive_losses = []
         gaussian_norm_losses = []
 
-        for shifts_per_image, gt_instances_per_image, pred_class_probs_per_image, pred_shift_deltas_per_image, \
-                pred_obj_probs_per_image in zip(
-                    shifts, gt_instances, pred_class_probs, pred_shift_deltas, pred_obj_probs):
-
+        for (
+            shifts_per_image,
+            gt_instances_per_image,
+            pred_class_probs_per_image,
+            pred_shift_deltas_per_image,
+            pred_obj_probs_per_image,
+        ) in zip(shifts, gt_instances, pred_class_probs, pred_shift_deltas, pred_obj_probs):
             locations = torch.cat(shifts_per_image, dim=0)
             labels = gt_instances_per_image.gt_classes
             gt_boxes = gt_instances_per_image.gt_boxes
@@ -208,13 +211,18 @@ class AutoAssign(nn.Module):
 
             with torch.no_grad():
                 # predicted_boxes_per_image: a_{j}^{loc}, shape: [j, 4]
-                predicted_boxes_per_image = \
-                    self.shift2box_transform.apply_deltas(pred_shift_deltas_per_image, locations)
+                predicted_boxes_per_image = self.shift2box_transform.apply_deltas(
+                    pred_shift_deltas_per_image, locations
+                )
                 # gt_pred_iou: IoU_{ij}^{loc}, shape: [i, j]
-                gt_pred_iou = pairwise_iou(
-                    gt_boxes,
-                    Boxes(predicted_boxes_per_image),
-                ).max(dim=0, keepdim=True).values.repeat(len(gt_instances_per_image), 1)
+                gt_pred_iou = (
+                    pairwise_iou(
+                        gt_boxes,
+                        Boxes(predicted_boxes_per_image),
+                    )
+                    .max(dim=0, keepdim=True)
+                    .values.repeat(len(gt_instances_per_image), 1)
+                )
 
                 # pred_box_prob_per_image: P{a_{j} \in A_{+}}, shape: [j, c]
                 pred_box_prob_per_image = torch.zeros_like(pred_class_probs_per_image)
@@ -242,20 +250,21 @@ class AutoAssign(nn.Module):
             composed_cls_prob = pred_class_probs_per_image[:, labels] * pred_obj_probs_per_image
 
             # matched_gt_shift_deltas: P_{ij}^{loc}
-            loss_box_reg = iou_loss_v2(
-                pred_shift_deltas_per_image.unsqueeze(0),
-                target_shift_deltas,
-                box_mode="ltrb",
-                loss_type=self.iou_loss_type,
-                reduction="none"
-            ) * self.reg_weight
+            loss_box_reg = (
+                iou_loss_v2(
+                    pred_shift_deltas_per_image.unsqueeze(0),
+                    target_shift_deltas,
+                    box_mode="ltrb",
+                    loss_type=self.iou_loss_type,
+                    reduction="none",
+                )
+                * self.reg_weight
+            )
             pred_reg_probs = (-loss_box_reg).exp()
 
             # positive_losses: { -log( Mean-max(P_{ij}^{cls} * P_{ij}^{loc}) ) }
             positive_losses.append(
-                positive_bag_loss(
-                    composed_cls_prob.permute(1, 0) * pred_reg_probs, is_in_boxes.float(), normal_probs
-                )
+                positive_bag_loss(composed_cls_prob.permute(1, 0) * pred_reg_probs, is_in_boxes.float(), normal_probs)
             )
 
             num_foreground += len(gt_instances_per_image)
@@ -371,7 +380,7 @@ class AutoAssign(nn.Module):
 
         boxes_all, scores_all, class_idxs_all = [cat(x) for x in [boxes_all, scores_all, class_idxs_all]]
         keep = batched_nms(boxes_all, scores_all, class_idxs_all, self.nms_threshold)
-        keep = keep[:self.max_detections_per_image]
+        keep = keep[: self.max_detections_per_image]
 
         result = Instances(image_size)
         result.pred_boxes = Boxes(boxes_all[keep])

@@ -40,7 +40,6 @@ class AdamW:
 
 @OPTIMIZERS.register()
 class D2_SGD:
-
     @staticmethod
     def build(config, model):
         params: List[Dict[str, Any]] = []

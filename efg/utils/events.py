@@ -54,7 +54,6 @@ class CommonMetricPrinter(EventWriter):
         self._last_write = None
 
     def write(self):
-
         storage = get_event_storage()
         iteration = storage.iter
 
@@ -76,9 +75,7 @@ class CommonMetricPrinter(EventWriter):
             iter_time = None
             # estimate eta on our own - more noisy
             if self._last_write is not None:
-                estimate_iter_time = (time.perf_counter() - self._last_write[1]) / (
-                    iteration - self._last_write[0]
-                )
+                estimate_iter_time = (time.perf_counter() - self._last_write[1]) / (iteration - self._last_write[0])
                 eta_seconds = estimate_iter_time * (self._max_iter - iteration)
                 eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
             self._last_write = (iteration, time.perf_counter())
@@ -99,11 +96,7 @@ class CommonMetricPrinter(EventWriter):
 
         # NOTE: max_mem is parsed by grep in "dev/parse_results.sh"
         losses = "  ".join(
-            [
-                "{}: {:.3f}".format(k, v.median(self._window_size))
-                for k, v in storage.histories().items()
-                if "loss" in k
-            ]
+            ["{}: {:.3f}".format(k, v.median(self._window_size)) for k, v in storage.histories().items() if "loss" in k]
         )
         other_metrics = "  ".join(
             [
@@ -171,9 +164,7 @@ class EventStorage:
 
         existing_hint = self._smoothing_hints.get(name)
         if existing_hint is not None:
-            assert (
-                existing_hint == smoothing_hint
-            ), "Scalar {} was put with a different smoothing_hint!".format(name)
+            assert existing_hint == smoothing_hint, "Scalar {} was put with a different smoothing_hint!".format(name)
         else:
             self._smoothing_hints[name] = smoothing_hint
 
@@ -220,9 +211,7 @@ class EventStorage:
         """
         result = {}
         for k, v in self._latest_scalars.items():
-            result[k] = (
-                self._history[k].median(self._window_size) if self._smoothing_hints[k] else v
-            )
+            result[k] = self._history[k].median(self._window_size) if self._smoothing_hints[k] else v
         return result
 
     def smoothing_hints(self):

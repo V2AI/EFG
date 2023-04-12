@@ -146,9 +146,7 @@ class Box2BoxTransformRotated(object):
 
         src_ctr_x, src_ctr_y, src_widths, src_heights, src_angles = torch.unbind(src_boxes, dim=1)
 
-        target_ctr_x, target_ctr_y, target_widths, target_heights, target_angles = torch.unbind(
-            target_boxes, dim=1
-        )
+        target_ctr_x, target_ctr_y, target_widths, target_heights, target_angles = torch.unbind(target_boxes, dim=1)
 
         wx, wy, ww, wh, wa = self.weights
         dx = wx * (target_ctr_x - src_ctr_x) / src_widths
@@ -162,9 +160,7 @@ class Box2BoxTransformRotated(object):
         da *= wa * math.pi / 180.0
 
         deltas = torch.stack((dx, dy, dw, dh, da), dim=1)
-        assert (
-            (src_widths > 0).all().item()
-        ), "Input boxes to Box2BoxTransformRotated are not valid!"
+        assert (src_widths > 0).all().item(), "Input boxes to Box2BoxTransformRotated are not valid!"
         return deltas
 
     def apply_deltas(self, deltas, boxes):
@@ -238,8 +234,7 @@ class Shift2BoxTransform(object):
         assert isinstance(shifts, torch.Tensor), type(shifts)
         assert isinstance(boxes, torch.Tensor), type(boxes)
 
-        deltas = torch.cat((shifts - boxes[..., :2], boxes[..., 2:] - shifts),
-                           dim=-1) * shifts.new_tensor(self.weights)
+        deltas = torch.cat((shifts - boxes[..., :2], boxes[..., 2:] - shifts), dim=-1) * shifts.new_tensor(self.weights)
         return deltas
 
     def apply_deltas(self, deltas, shifts):
@@ -259,7 +254,7 @@ class Shift2BoxTransform(object):
             return torch.empty_like(deltas)
 
         deltas = deltas.view(deltas.size()[:-1] + (-1, 4)) / shifts.new_tensor(self.weights)
-        boxes = torch.cat((shifts.unsqueeze(-2) - deltas[..., :2],
-                           shifts.unsqueeze(-2) + deltas[..., 2:]),
-                          dim=-1).view(deltas.size()[:-2] + (-1, ))
+        boxes = torch.cat(
+            (shifts.unsqueeze(-2) - deltas[..., :2], shifts.unsqueeze(-2) + deltas[..., 2:]), dim=-1
+        ).view(deltas.size()[:-2] + (-1,))
         return boxes

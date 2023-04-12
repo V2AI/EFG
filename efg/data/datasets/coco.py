@@ -54,11 +54,11 @@ class COCODataset(BaseDataset):
             self.dataset_name = "coco_2017_val"
 
         if config.dataset.task == "panoptic":
-            self.task_key = "panoptic"      # for task: panoptic/semantic segmentation
+            self.task_key = "panoptic"  # for task: panoptic/semantic segmentation
         elif config.dataset.task == "keypoints":
-            self.task_key = "coco_person"   # for task: keypoints detection
+            self.task_key = "coco_person"  # for task: keypoints detection
         else:
-            self.task_key = "coco"          # for task: instance detection/segmentation
+            self.task_key = "coco"  # for task: instance detection/segmentation
 
         self.meta = self._get_metadata(config)
 
@@ -66,7 +66,8 @@ class COCODataset(BaseDataset):
 
         if self.task_key in ["coco", "coco_person"]:
             self.dataset_dicts = self._load_annotations(
-                self.meta["json_file"], self.meta["image_root"], self.dataset_name)
+                self.meta["json_file"], self.meta["image_root"], self.dataset_name
+            )
         elif self.task_key in ["panoptic"]:
             # panoptic segmentation task, support below dataset names:
             #  * coco_2017_train_panoptic_separated
@@ -74,19 +75,20 @@ class COCODataset(BaseDataset):
             #  * coco_2017_val_100_panoptic_separated
             if "_separated" in self.dataset_name:
                 self.dataset_dicts = self._load_annotations(
-                    self.meta["json_file"],
-                    self.meta["image_root"],
-                    self.dataset_name
+                    self.meta["json_file"], self.meta["image_root"], self.dataset_name
                 )
                 dicts4seg = load_sem_seg(self.meta["sem_seg_root"], self.meta["image_root"])
 
-                assert len(self.dataset_dicts) == len(dicts4seg), \
-                    "len(self.dataset_dicts): {}, len(dicts4seg): {}".format(len(self.dataset_dicts), len(dicts4seg))
+                assert len(self.dataset_dicts) == len(
+                    dicts4seg
+                ), "len(self.dataset_dicts): {}, len(dicts4seg): {}".format(len(self.dataset_dicts), len(dicts4seg))
 
                 for idx, (dataset_dict, dict4seg) in enumerate(zip(self.dataset_dicts, dicts4seg)):
-                    assert dataset_dict['file_name'] == dict4seg['file_name'], \
-                        "idx: {}, dataset_dict['file_name']: {}, dict4seg['file_name']: {}".format(
-                            idx, dataset_dict['file_name'], dict4seg['file_name'])
+                    assert (
+                        dataset_dict["file_name"] == dict4seg["file_name"]
+                    ), "idx: {}, dataset_dict['file_name']: {}, dict4seg['file_name']: {}".format(
+                        idx, dataset_dict["file_name"], dict4seg["file_name"]
+                    )
                     assert "sem_seg_file_name" not in dataset_dict
                     dataset_dict["sem_seg_file_name"] = dict4seg["sem_seg_file_name"]
 
@@ -178,12 +180,11 @@ class COCODataset(BaseDataset):
         if "width" in self.dataset_dicts[0] and "height" in self.dataset_dicts[0]:
             for i in range(len(self)):
                 dataset_dict = self.dataset_dicts[i]
-                if dataset_dict['width'] / dataset_dict['height'] > 1:
+                if dataset_dict["width"] / dataset_dict["height"] > 1:
                     self.aspect_ratios[i] = 1
 
     def __getitem__(self, index):
-        """Load data, apply transforms, converto to Instances.
-        """
+        """Load data, apply transforms, converto to Instances."""
         dataset_dict = copy.deepcopy(self.dataset_dicts[index])
 
         # read image
@@ -210,7 +211,10 @@ class COCODataset(BaseDataset):
 
         # apply transfrom
         image, annotations = self._apply_transforms(
-            image, annotations, keypoint_hflip_indices=self.keypoint_hflip_indices, img_id=dataset_dict['image_id'],
+            image,
+            annotations,
+            keypoint_hflip_indices=self.keypoint_hflip_indices,
+            img_id=dataset_dict["image_id"],
         )
 
         if self.load_annotations:
@@ -296,8 +300,7 @@ class COCODataset(BaseDataset):
         with contextlib.redirect_stdout(io.StringIO()):
             coco_api = COCO(json_file)
         if timer.seconds() > 1:
-            logger.info("Loading {} takes {:.2f} seconds.".format(
-                json_file, timer.seconds()))
+            logger.info("Loading {} takes {:.2f} seconds.".format(json_file, timer.seconds()))
 
         id_map = None
         if dataset_name is not None:
@@ -367,7 +370,7 @@ class COCODataset(BaseDataset):
         ann_keys = ["iscrowd", "bbox", "keypoints", "category_id"] + (extra_annotation_keys or [])
         num_instances_without_valid_segmentation = 0
 
-        for (img_dict, anno_dict_list) in imgs_anns:
+        for img_dict, anno_dict_list in imgs_anns:
             record = {}
             record["file_name"] = os.path.join(image_root, img_dict["file_name"])
             record["height"] = img_dict["height"]
@@ -389,17 +392,17 @@ class COCODataset(BaseDataset):
                 obj = {key: anno[key] for key in ann_keys if key in anno}
 
                 segm = anno.get("segmentation", None)
-                if segm:    # either list[list[float]] or dict(RLE)
+                if segm:  # either list[list[float]] or dict(RLE)
                     if not isinstance(segm, dict):
                         # filter out invalid polygons (< 3 points)
                         segm = [poly for poly in segm if len(poly) % 2 == 0 and len(poly) >= 6]
                         if len(segm) == 0:
                             num_instances_without_valid_segmentation += 1
-                            continue    # ignore this instance
+                            continue  # ignore this instance
                     obj["segmentation"] = segm
 
                 keypts = anno.get("keypoints", None)
-                if keypts:    # list[int]
+                if keypts:  # list[int]
                     for idx, v in enumerate(keypts):
                         if idx % 3 != 2:
                             # COCO's segmentation coordinates are floating points in [0, H or W],
@@ -426,7 +429,7 @@ class COCODataset(BaseDataset):
     def _get_metadata(self, config):
         if self.task_key in ["coco", "coco_person"]:
             meta = _get_builtin_metadata(self.task_key)
-            self.data_root = config.dataset.source[self.task_key]['root']
+            self.data_root = config.dataset.source[self.task_key]["root"]
             image_root, json_file = config.dataset.source[self.task_key][config.task]
             meta["image_root"] = self.data_root + image_root
             meta["json_file"] = self.data_root + json_file
@@ -439,16 +442,22 @@ class COCODataset(BaseDataset):
             image_root, json_file = config.dataset.source["coco"][prefix_instances]
             panoptic_root, panoptic_json, semantic_root = config.dataset.source[self.task_key][prefix_panoptic]
             meta["image_root"] = osp.join(self.data_root, image_root) if "://" not in image_root else image_root
-            meta["sem_seg_root"] = \
+            meta["sem_seg_root"] = (
                 os.path.join(self.data_root, semantic_root) if "://" not in semantic_root else semantic_root
+            )
 
             if "_separated" in self.name:
-                meta["json_file"] = osp.join(self.data_root, json_file) \
-                    if "://" not in image_root else osp.join(image_root, json_file)
-                meta["panoptic_root"] = os.path.join(self.data_root, panoptic_root) \
-                    if "://" not in panoptic_root else panoptic_root
-                meta["panoptic_json"] = os.path.join(self.data_root, panoptic_json) \
-                    if "://" not in panoptic_root else osp.join(panoptic_root, panoptic_json)
+                meta["json_file"] = (
+                    osp.join(self.data_root, json_file) if "://" not in image_root else osp.join(image_root, json_file)
+                )
+                meta["panoptic_root"] = (
+                    os.path.join(self.data_root, panoptic_root) if "://" not in panoptic_root else panoptic_root
+                )
+                meta["panoptic_json"] = (
+                    os.path.join(self.data_root, panoptic_json)
+                    if "://" not in panoptic_root
+                    else osp.join(panoptic_root, panoptic_json)
+                )
         return meta
 
     @property
@@ -508,8 +517,8 @@ def load_sem_seg(gt_root, image_root, gt_ext="png", image_ext="jpg"):
         logger.warn(
             f"Directory {image_root} and {gt_root} has {len(input_files)} and {len(gt_files)} files, respectively."
         )
-        input_basenames = [os.path.basename(f)[:-len(image_ext)] for f in input_files]
-        gt_basenames = [os.path.basename(f)[:-len(gt_ext)] for f in gt_files]
+        input_basenames = [os.path.basename(f)[: -len(image_ext)] for f in input_files]
+        gt_basenames = [os.path.basename(f)[: -len(gt_ext)] for f in gt_files]
         intersect = list(set(input_basenames) & set(gt_basenames))
         # sort, otherwise each worker may obtain a list[dict] in different order
         intersect = sorted(intersect)
@@ -520,7 +529,7 @@ def load_sem_seg(gt_root, image_root, gt_ext="png", image_ext="jpg"):
     logger.info("Loaded {} images with semantic segmentation from {}".format(len(input_files), image_root))
 
     dataset_dicts = []
-    for (img_path, gt_path) in zip(input_files, gt_files):
+    for img_path, gt_path in zip(input_files, gt_files):
         record = {}
         record["file_name"] = img_path
         record["sem_seg_file_name"] = gt_path
@@ -556,16 +565,16 @@ def convert_to_coco_dict(dataset_name, dataset_dicts, metadata):
     # unmap the category mapping ids for COCO
     if hasattr(metadata, "thing_dataset_id_to_contiguous_id"):
         reverse_id_mapping = {v: k for k, v in metadata.thing_dataset_id_to_contiguous_id.items()}
-        def reverse_id_mapper(contiguous_id): return reverse_id_mapping[contiguous_id]  # noqa
-    else:
-        def reverse_id_mapper(contiguous_id): return contiguous_id    # noqa
 
-    categories = [
-        {
-            "id": reverse_id_mapper(id),
-            "name": name
-        } for id, name in enumerate(metadata.thing_classes)
-    ]
+        def reverse_id_mapper(contiguous_id):
+            return reverse_id_mapping[contiguous_id]  # noqa
+
+    else:
+
+        def reverse_id_mapper(contiguous_id):
+            return contiguous_id  # noqa
+
+    categories = [{"id": reverse_id_mapper(id), "name": name} for id, name in enumerate(metadata.thing_classes)]
 
     logger.info("Converting dataset dicts into COCO format")
     coco_images = []
@@ -603,7 +612,7 @@ def convert_to_coco_dict(dataset_name, dataset_dicts, metadata):
                 area = Boxes([bbox_xy]).area()[0].item()
 
             if "keypoints" in annotation:
-                keypoints = annotation["keypoints"]    # list[int]
+                keypoints = annotation["keypoints"]  # list[int]
                 for idx, v in enumerate(keypoints):
                     if idx % 3 != 2:
                         # COCO's segmentation coordinates are floating points in [0, H or W],
@@ -640,8 +649,7 @@ def convert_to_coco_dict(dataset_name, dataset_dicts, metadata):
 
     info = {
         "date_created": str(datetime.datetime.now()),
-        "description":
-        "Automatically generated COCO json file for efg.",
+        "description": "Automatically generated COCO json file for efg.",
     }
     coco_dict = {
         "info": info,
@@ -677,8 +685,7 @@ def convert_to_coco_json(dataset_name, output_file, allow_cached=True):
             coco_dict = convert_to_coco_dict(dataset_name)
 
             with PathManager.open(output_file, "w") as json_file:
-                logger.info(
-                    f"Caching annotations in COCO format: {output_file}")
+                logger.info(f"Caching annotations in COCO format: {output_file}")
                 json.dump(coco_dict, json_file)
 
 
@@ -795,7 +802,7 @@ def print_instances_class_histogram(dataset_dicts, class_names):
     """
     num_classes = len(class_names)
     hist_bins = np.arange(num_classes + 1)
-    histogram = np.zeros((num_classes, ), dtype=np.int)
+    histogram = np.zeros((num_classes,), dtype=np.int)
     for entry in dataset_dicts:
         annos = entry["annotations"]
         classes = [x["category_id"] for x in annos if not x.get("iscrowd", 0)]

@@ -27,9 +27,7 @@ class _DeformConv(Function):
         im2col_step=64,
     ):
         if input is not None and input.dim() != 4:
-            raise ValueError(
-                "Expected 4D tensor as input, got {}D tensor instead.".format(input.dim())
-            )
+            raise ValueError("Expected 4D tensor as input, got {}D tensor instead.".format(input.dim()))
         ctx.stride = _pair(stride)
         ctx.padding = _pair(padding)
         ctx.dilation = _pair(dilation)
@@ -39,9 +37,7 @@ class _DeformConv(Function):
 
         ctx.save_for_backward(input, offset, weight)
 
-        output = input.new_empty(
-            _DeformConv._output_size(input, weight, ctx.padding, ctx.dilation, ctx.stride)
-        )
+        output = input.new_empty(_DeformConv._output_size(input, weight, ctx.padding, ctx.dilation, ctx.stride))
 
         ctx.bufs_ = [input.new_empty(0), input.new_empty(0)]  # columns, ones
 
@@ -146,9 +142,7 @@ class _DeformConv(Function):
             output_size += ((in_size + (2 * pad) - kernel) // stride_ + 1,)
         if not all(map(lambda s: s > 0, output_size)):
             raise ValueError(
-                "convolution input is too small (output would be {})".format(
-                    "x".join(map(str, output_size))
-                )
+                "convolution input is too small (output would be {})".format("x".join(map(str, output_size)))
             )
         return output_size
 
@@ -201,12 +195,7 @@ class _ModulatedDeformConv(Function):
             bias = input.new_empty(1)  # fake tensor
         if not input.is_cuda:
             raise NotImplementedError
-        if (
-            weight.requires_grad
-            or mask.requires_grad
-            or offset.requires_grad
-            or input.requires_grad
-        ):
+        if weight.requires_grad or mask.requires_grad or offset.requires_grad or input.requires_grad:
             ctx.save_for_backward(input, offset, mask, weight, bias)
         output = input.new_empty(_ModulatedDeformConv._infer_shape(ctx, input, weight))
         ctx._bufs = [input.new_empty(0), input.new_empty(0)]
@@ -292,12 +281,8 @@ class _ModulatedDeformConv(Function):
         channels_out = weight.size(0)
         height, width = input.shape[2:4]
         kernel_h, kernel_w = weight.shape[2:4]
-        height_out = (
-            height + 2 * ctx.padding - (ctx.dilation * (kernel_h - 1) + 1)
-        ) // ctx.stride + 1
-        width_out = (
-            width + 2 * ctx.padding - (ctx.dilation * (kernel_w - 1) + 1)
-        ) // ctx.stride + 1
+        height_out = (height + 2 * ctx.padding - (ctx.dilation * (kernel_h - 1) + 1)) // ctx.stride + 1
+        width_out = (width + 2 * ctx.padding - (ctx.dilation * (kernel_w - 1) + 1)) // ctx.stride + 1
         return n, channels_out, height_out, width_out
 
 
@@ -333,12 +318,10 @@ class DeformConv(nn.Module):
         super(DeformConv, self).__init__()
 
         assert not bias
-        assert in_channels % groups == 0, "in_channels {} cannot be divisible by groups {}".format(
-            in_channels, groups
+        assert in_channels % groups == 0, "in_channels {} cannot be divisible by groups {}".format(in_channels, groups)
+        assert out_channels % groups == 0, "out_channels {} cannot be divisible by groups {}".format(
+            out_channels, groups
         )
-        assert (
-            out_channels % groups == 0
-        ), "out_channels {} cannot be divisible by groups {}".format(out_channels, groups)
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -351,9 +334,7 @@ class DeformConv(nn.Module):
         self.norm = norm
         self.activation = activation
 
-        self.weight = nn.Parameter(
-            torch.Tensor(out_channels, in_channels // self.groups, *self.kernel_size)
-        )
+        self.weight = nn.Parameter(torch.Tensor(out_channels, in_channels // self.groups, *self.kernel_size))
         self.bias = None
 
         nn.init.kaiming_uniform_(self.weight, nonlinearity="relu")
@@ -366,9 +347,7 @@ class DeformConv(nn.Module):
             # This computes the height and width of the output tensor
             output_shape = [
                 (i + 2 * p - (di * (k - 1) + 1)) // s + 1
-                for i, p, di, k, s in zip(
-                    x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride
-                )
+                for i, p, di, k, s in zip(x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride)
             ]
             output_shape = [x.shape[0], self.weight.shape[0]] + output_shape
             return _NewEmptyTensorOp.apply(x, output_shape)
@@ -440,9 +419,7 @@ class ModulatedDeformConv(nn.Module):
         self.norm = norm
         self.activation = activation
 
-        self.weight = nn.Parameter(
-            torch.Tensor(out_channels, in_channels // groups, *self.kernel_size)
-        )
+        self.weight = nn.Parameter(torch.Tensor(out_channels, in_channels // groups, *self.kernel_size))
         if bias:
             self.bias = nn.Parameter(torch.Tensor(out_channels))
         else:
@@ -456,9 +433,7 @@ class ModulatedDeformConv(nn.Module):
         if x.numel() == 0:
             output_shape = [
                 (i + 2 * p - (di * (k - 1) + 1)) // s + 1
-                for i, p, di, k, s in zip(
-                    x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride
-                )
+                for i, p, di, k, s in zip(x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride)
             ]
             output_shape = [x.shape[0], self.weight.shape[0]] + output_shape
             return _NewEmptyTensorOp.apply(x, output_shape)

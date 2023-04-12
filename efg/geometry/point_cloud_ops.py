@@ -107,9 +107,7 @@ def _points_to_voxel_kernel(
     return voxel_num
 
 
-def points_to_voxel(
-    points, voxel_size, coors_range, max_points=35, reverse_index=True, max_voxels=20000
-):
+def points_to_voxel(points, voxel_size, coors_range, max_points=35, reverse_index=True, max_voxels=20000):
     """convert kitti points(N, >=3) to voxels. This version calculate
     everything in one loop. now it takes only 4.2ms(complete point cloud)
     with jit and 3.2ghz cpu.(don't calculate other features)
@@ -144,9 +142,7 @@ def points_to_voxel(
     # don't create large array in jit(nopython=True) code.
     num_points_per_voxel = np.zeros(shape=(max_voxels,), dtype=np.int32)
     coor_to_voxelidx = -np.ones(shape=voxelmap_shape, dtype=np.int32)
-    voxels = np.zeros(
-        shape=(max_voxels, max_points, points.shape[-1]), dtype=points.dtype
-    )
+    voxels = np.zeros(shape=(max_voxels, max_points, points.shape[-1]), dtype=points.dtype)
     coors = np.zeros(shape=(max_voxels, 3), dtype=np.int32)
     if reverse_index:
         voxel_num = _points_to_voxel_reverse_kernel(

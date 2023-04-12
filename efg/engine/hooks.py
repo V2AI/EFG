@@ -5,9 +5,9 @@ from collections import Counter, Mapping
 
 from torch.nn.utils import clip_grad
 
+from efg.utils import distributed as comm
 from efg.utils.events import EventWriter
 from efg.utils.timer import Timer
-from efg.utils import distributed as comm
 
 from .registry import HOOKS
 
@@ -66,7 +66,6 @@ class Optimization(HookBase):
             self.clip = False
 
     def after_step(self):
-
         losses = self.trainer.outputs["losses"]
 
         self.trainer.optimizer.zero_grad()
@@ -194,8 +193,11 @@ class PeriodicWriter(HookBase):
         self._period = period
 
     def after_step(self):
-        if (self.trainer.iter + 1) % self._period == 0 or \
-                (self.trainer.iter == self.trainer.max_iters - 1) or (self.trainer.iter == 0):
+        if (
+            (self.trainer.iter + 1) % self._period == 0
+            or (self.trainer.iter == self.trainer.max_iters - 1)
+            or (self.trainer.iter == 0)
+        ):
             for writer in self._writers:
                 writer.write()
 
@@ -262,9 +264,7 @@ class EvalHook(HookBase):
 
         if results:
             if isinstance(results, dict):
-                assert isinstance(
-                    results, dict
-                ), "Eval function must return a dict. Got {} instead.".format(results)
+                assert isinstance(results, dict), "Eval function must return a dict. Got {} instead.".format(results)
 
                 flattened_results = flatten_results_dict(results)
                 for k, v in flattened_results.items():

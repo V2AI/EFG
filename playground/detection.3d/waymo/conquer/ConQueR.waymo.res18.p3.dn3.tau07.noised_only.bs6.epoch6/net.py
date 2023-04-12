@@ -6,7 +6,6 @@ __all__ = ["build_model", "AdamWMulti", "CustomTrainer", "CustomWDDataset", "Vox
 
 
 def build_model(self, config):
-
     model = VoxelDETR(config)
 
     return model

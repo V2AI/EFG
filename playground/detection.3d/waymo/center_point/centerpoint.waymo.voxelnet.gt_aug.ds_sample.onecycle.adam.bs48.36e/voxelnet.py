@@ -42,7 +42,6 @@ class VoxelNet(nn.Module):
         self.to(self.device)
 
     def assign_one(self, datas, info, data_id):
-
         max_objs = self._max_objs
         class_names_by_task = [t["class_names"] for t in self.tasks]
         num_classes_by_task = [t["num_classes"] for t in self.tasks]
@@ -105,19 +104,23 @@ class VoxelNet(nn.Module):
             ind = np.zeros((max_objs), dtype=np.int64)
             mask = np.zeros((max_objs), dtype=np.uint8)
             cat = np.zeros((max_objs), dtype=np.int64)
-            num_objs = min(gt_dict['gt_boxes'][idx].shape[0], max_objs)
+            num_objs = min(gt_dict["gt_boxes"][idx].shape[0], max_objs)
             for k in range(num_objs):
-                cls_id = gt_dict['gt_classes'][idx][k] - 1
-                L, W = gt_dict['gt_boxes'][idx][k][3], gt_dict['gt_boxes'][idx][k][4]
+                cls_id = gt_dict["gt_classes"][idx][k] - 1
+                L, W = gt_dict["gt_boxes"][idx][k][3], gt_dict["gt_boxes"][idx][k][4]
                 L, W = L / voxel_size[0] / self.out_size_factor, W / voxel_size[1] / self.out_size_factor
                 if L > 0 and W > 0:
                     radius = gaussian_radius((L, W), min_overlap=self.gaussian_overlap)
                     radius = max(self._min_radius, int(radius))
                     # be really careful for the coordinate system of your box annotation.
-                    x, y, z = gt_dict['gt_boxes'][idx][k][0], gt_dict['gt_boxes'][idx][k][1], \
-                        gt_dict['gt_boxes'][idx][k][2]
-                    coor_x, coor_y = (x - pc_range[0]) / voxel_size[0] / self.out_size_factor, \
-                        (y - pc_range[1]) / voxel_size[1] / self.out_size_factor
+                    x, y, z = (
+                        gt_dict["gt_boxes"][idx][k][0],
+                        gt_dict["gt_boxes"][idx][k][1],
+                        gt_dict["gt_boxes"][idx][k][2],
+                    )
+                    coor_x, coor_y = (x - pc_range[0]) / voxel_size[0] / self.out_size_factor, (
+                        y - pc_range[1]
+                    ) / voxel_size[1] / self.out_size_factor
                     ct = np.array([coor_x, coor_y], dtype=np.float32)
                     ct_int = ct.astype(np.int32)
 
@@ -134,17 +137,20 @@ class VoxelNet(nn.Module):
                     ind[new_idx] = y * feature_map_size[0] + x
                     mask[new_idx] = 1
 
-                    vx, vy = gt_dict['gt_boxes'][idx][k][6:8]
-                    rot = gt_dict['gt_boxes'][idx][k][-1]
-                    anno_box[new_idx] = np.concatenate((
-                        ct - (x, y),
-                        z,
-                        np.log(gt_dict['gt_boxes'][idx][k][3:6]),
-                        np.array(vx),
-                        np.array(vy),
-                        np.sin(rot),
-                        np.cos(rot)
-                    ), axis=None)
+                    vx, vy = gt_dict["gt_boxes"][idx][k][6:8]
+                    rot = gt_dict["gt_boxes"][idx][k][-1]
+                    anno_box[new_idx] = np.concatenate(
+                        (
+                            ct - (x, y),
+                            z,
+                            np.log(gt_dict["gt_boxes"][idx][k][3:6]),
+                            np.array(vx),
+                            np.array(vy),
+                            np.sin(rot),
+                            np.cos(rot),
+                        ),
+                        axis=None,
+                    )
 
             hms.append(hm)
             anno_boxs.append(anno_box)
@@ -153,8 +159,8 @@ class VoxelNet(nn.Module):
             cats.append(cat)
 
         # used for two stage code
-        boxes = flatten(gt_dict['gt_boxes'])
-        classes = merge_multi_group_label(gt_dict['gt_classes'], num_classes_by_task)
+        boxes = flatten(gt_dict["gt_boxes"])
+        classes = merge_multi_group_label(gt_dict["gt_classes"], num_classes_by_task)
         gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)
         boxes_and_cls = np.concatenate((boxes, classes.reshape(-1, 1).astype(np.float32)), axis=1)
 
@@ -165,14 +171,16 @@ class VoxelNet(nn.Module):
         boxes_and_cls = boxes_and_cls[:, [0, 1, 2, 3, 4, 5, 8, 6, 7, 9]]
         gt_boxes_and_cls[:num_obj] = boxes_and_cls
 
-        example.update({
-            'gt_boxes_and_cls': gt_boxes_and_cls,
-            'hm': hms,
-            'anno_box': anno_boxs,
-            'ind': inds,
-            'mask': masks,
-            'cat': cats
-        })
+        example.update(
+            {
+                "gt_boxes_and_cls": gt_boxes_and_cls,
+                "hm": hms,
+                "anno_box": anno_boxs,
+                "ind": inds,
+                "mask": masks,
+                "cat": cats,
+            }
+        )
 
         return example
 
@@ -236,7 +244,7 @@ def collate(batch_list, device):
                 max_gt = max(max_gt, len(elems[k]))
                 batch_gt_boxes3d = np.zeros((batch_size, max_gt, *elems[0].shape[1:]), dtype=elems[0].dtype)
             for i in range(batch_size):
-                batch_gt_boxes3d[i, :len(elems[i])] = elems[i]
+                batch_gt_boxes3d[i, : len(elems[i])] = elems[i]
             if key != "names":
                 batch_gt_boxes3d = torch.tensor(batch_gt_boxes3d)
             ret[key] = batch_gt_boxes3d

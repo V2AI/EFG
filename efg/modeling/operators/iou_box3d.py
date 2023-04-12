@@ -111,9 +111,7 @@ class _box3d_overlap(Function):
         raise ValueError("box3d_overlap backward is not supported")
 
 
-def box3d_overlap(
-    boxes1: torch.Tensor, boxes2: torch.Tensor, eps: float = 1e-4
-) -> Tuple[torch.Tensor, torch.Tensor]:
+def box3d_overlap(boxes1: torch.Tensor, boxes2: torch.Tensor, eps: float = 1e-4) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Computes the intersection of 3D boxes1 and boxes2.
     Inputs boxes1, boxes2 are tensors of shape (B, 8, 3)
@@ -179,9 +177,7 @@ def box3d_overlap_sampling_batched(boxes1, boxes2, num_samples: int):
     return ious
 
 
-def box3d_overlap_sampling(
-    box1: torch.Tensor, box2: torch.Tensor, num_samples: int = 10000
-):
+def box3d_overlap_sampling(box1: torch.Tensor, box2: torch.Tensor, num_samples: int = 10000):
     """
     Computes the intersection of two boxes by sampling points
     """
@@ -314,9 +310,7 @@ def is_point_inside_box(box: torch.Tensor, points: torch.Tensor):
     return ins
 
 
-def box_planar_dir(
-    box: torch.Tensor, dot_eps: float = DOT_EPS, area_eps: float = AREA_EPS
-) -> torch.Tensor:
+def box_planar_dir(box: torch.Tensor, dot_eps: float = DOT_EPS, area_eps: float = AREA_EPS) -> torch.Tensor:
     """
     Finds the unit vector n which is perpendicular to each plane in the box
     and points towards the inside of the box.
@@ -487,16 +481,12 @@ def is_inside(
     p_proj = None
     if return_proj:
         # solving for (a, b)
-        A = torch.tensor(
-            [[1.0, e0.dot(e1)], [e0.dot(e1), 1.0]], dtype=torch.float32, device=device
-        )
+        A = torch.tensor([[1.0, e0.dot(e1)], [e0.dot(e1), 1.0]], dtype=torch.float32, device=device)
         B = torch.zeros((2, points.shape[0]), dtype=torch.float32, device=device)
         B[0, :] = torch.sum((points - plane_ctr.view(1, 3)) * e0.view(1, 3), dim=-1)
         B[1, :] = torch.sum((points - plane_ctr.view(1, 3)) * e1.view(1, 3), dim=-1)
         ab = A.inverse() @ B  # (2, P)
-        p_proj = plane_ctr.view(1, 3) + ab.transpose(0, 1) @ torch.stack(
-            (e0, e1), dim=0
-        )
+        p_proj = plane_ctr.view(1, 3) + ab.transpose(0, 1) @ torch.stack((e0, e1), dim=0)
 
     # solving for c
     # c = (point - ctr - a * e0 - b * e1).dot(n)

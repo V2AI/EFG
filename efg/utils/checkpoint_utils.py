@@ -15,9 +15,7 @@ def get_missing_parameters_message(keys: list):
     """
     groups = _group_checkpoint_keys(keys)
     msg = "Some model parameters are not in the checkpoint:\n"
-    msg += "\n".join(
-        "  " + colored(k + _group_to_str(v), "blue") for k, v in groups.items()
-    )
+    msg += "\n".join("  " + colored(k + _group_to_str(v), "blue") for k, v in groups.items())
     return msg
 
 
@@ -32,10 +30,7 @@ def get_unexpected_parameters_message(keys: list):
     """
     groups = _group_checkpoint_keys(keys)
     msg = "The checkpoint contains parameters not used by the model:\n"
-    msg += "\n".join(
-        "  " + colored(k + _group_to_str(v), "magenta")
-        for k, v in groups.items()
-    )
+    msg += "\n".join("  " + colored(k + _group_to_str(v), "magenta") for k, v in groups.items())
     return msg
 
 
@@ -51,7 +46,7 @@ def _strip_prefix_if_present(state_dict: collections.OrderedDict, prefix: str):
         return
 
     for key in keys:
-        newkey = key[len(prefix):]
+        newkey = key[len(prefix) :]
         state_dict[newkey] = state_dict.pop(key)
 
     # also strip the prefix in metadata, if any..
@@ -68,7 +63,7 @@ def _strip_prefix_if_present(state_dict: collections.OrderedDict, prefix: str):
 
             if len(key) == 0:
                 continue
-            newkey = key[len(prefix):]
+            newkey = key[len(prefix) :]
             metadata[newkey] = metadata.pop(key)
 
 
@@ -86,7 +81,7 @@ def _group_checkpoint_keys(keys: list):
     for key in keys:
         pos = key.rfind(".")
         if pos >= 0:
-            head, tail = key[:pos], [key[pos + 1:]]
+            head, tail = key[:pos], [key[pos + 1 :]]
         else:
             head, tail = key, []
         groups[head].extend(tail)

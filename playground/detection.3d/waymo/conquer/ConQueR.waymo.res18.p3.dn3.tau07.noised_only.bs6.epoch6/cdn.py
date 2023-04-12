@@ -4,27 +4,27 @@ from torch.nn import functional as F
 
 def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, label_enc):
     """
-        A major difference of DINO from DN-DETR is that the author process pattern embedding pattern embedding in its
-        detector forward function and use learnable tgt embedding, so we change this function a little bit.
-        :param dn_args: targets, dn_number, label_noise_ratio, box_noise_scale
-        :param training: if it is training or inference
-        :param num_queries: number of queires
-        :param num_classes: number of classes
-        :param hidden_dim: transformer hidden dim
-        :param label_enc: encode labels in dn
-        :return:
-        """
+    A major difference of DINO from DN-DETR is that the author process pattern embedding pattern embedding in its
+    detector forward function and use learnable tgt embedding, so we change this function a little bit.
+    :param dn_args: targets, dn_number, label_noise_ratio, box_noise_scale
+    :param training: if it is training or inference
+    :param num_queries: number of queires
+    :param num_classes: number of classes
+    :param hidden_dim: transformer hidden dim
+    :param label_enc: encode labels in dn
+    :return:
+    """
     if training:
         targets, dn_number, label_noise_ratio, box_noise_scale = dn_args
 
-        known = [(torch.ones_like(t['labels'])).cuda() for t in targets]
+        known = [(torch.ones_like(t["labels"])).cuda() for t in targets]
         batch_size = len(known)
         known_num = [sum(k) for k in known]
 
         unmask_bbox = unmask_label = torch.cat(known)
-        labels = torch.cat([t['labels'] for t in targets])
-        boxes = torch.cat([t['gt_boxes'] for t in targets])
-        batch_idx = torch.cat([torch.full_like(t['labels'].long(), i) for i, t in enumerate(targets)])
+        labels = torch.cat([t["labels"] for t in targets])
+        boxes = torch.cat([t["gt_boxes"] for t in targets])
+        batch_idx = torch.cat([torch.full_like(t["labels"].long(), i) for i, t in enumerate(targets)])
 
         known_indice = torch.nonzero(unmask_label + unmask_bbox)
         known_indice = known_indice.view(-1)
@@ -71,7 +71,7 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
             known_bbox_expand[:, 3:6] = known_bbox_[:, 3:6] - known_bbox_[:, :3]
             known_bbox_expand[:, 6:] = known_bbox_[:, 6:]
 
-        m = known_labels_expaned.long().to('cuda')
+        m = known_labels_expaned.long().to("cuda")
         input_label_embed = F.one_hot(m, num_classes=num_classes).float()
         input_bbox_embed = known_bbox_expand
 
@@ -82,7 +82,7 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
         input_query_label = padding_label.repeat(batch_size, 1, 1)
         input_query_bbox = padding_bbox.repeat(batch_size, 1, 1)
 
-        map_known_indice = torch.tensor([]).to('cuda')
+        map_known_indice = torch.tensor([]).to("cuda")
         if len(known_num):
             map_known_indice = torch.cat([torch.tensor(range(num)) for num in known_num])  # [1,2, 1,2,3]
             map_known_indice = torch.cat([map_known_indice + single_pad * i for i in range(2 * dn_number)]).long()
@@ -91,7 +91,7 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
             input_query_bbox[(known_bid.long(), map_known_indice)] = input_bbox_embed
 
         tgt_size = pad_size + num_queries
-        attn_mask = torch.ones(tgt_size, tgt_size).to('cuda') < 0
+        attn_mask = torch.ones(tgt_size, tgt_size).to("cuda") < 0
         # match query cannot see the reconstruct GTs
         attn_mask[pad_size:, :pad_size] = True
         # gt cannot see queries
@@ -99,19 +99,18 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
         # reconstruct cannot see each other
         for i in range(dn_number):
             if i == 0:
-                attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
+                attn_mask[single_pad * 2 * i : single_pad * 2 * (i + 1), single_pad * 2 * (i + 1) : pad_size] = True
             if i == dn_number - 1:
-                attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), :single_pad * i * 2] = True
+                attn_mask[single_pad * 2 * i : single_pad * 2 * (i + 1), : single_pad * i * 2] = True
             else:
-                attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
-                attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), :single_pad * 2 * i] = True
+                attn_mask[single_pad * 2 * i : single_pad * 2 * (i + 1), single_pad * 2 * (i + 1) : pad_size] = True
+                attn_mask[single_pad * 2 * i : single_pad * 2 * (i + 1), : single_pad * 2 * i] = True
 
         dn_meta = {
-            'pad_size': pad_size,
-            'num_dn_group': dn_number,
+            "pad_size": pad_size,
+            "num_dn_group": dn_number,
         }
     else:
-
         input_query_label = None
         input_query_bbox = None
         attn_mask = None
@@ -122,19 +121,19 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
 
 def dn_post_process(outputs_class, outputs_coord, dn_meta, aux_loss, _set_aux_loss):
     """
-        post process of dn after output from the transformer
-        put the dn part in the dn_meta
+    post process of dn after output from the transformer
+    put the dn part in the dn_meta
     """
-    if dn_meta and dn_meta['pad_size'] > 0:
-        output_known_class = outputs_class[:, :, :dn_meta['pad_size'], :]
-        output_known_coord = outputs_coord[:, :, :dn_meta['pad_size'], :]
-        outputs_class = outputs_class[:, :, dn_meta['pad_size']:, :]
-        outputs_coord = outputs_coord[:, :, dn_meta['pad_size']:, :]
+    if dn_meta and dn_meta["pad_size"] > 0:
+        output_known_class = outputs_class[:, :, : dn_meta["pad_size"], :]
+        output_known_coord = outputs_coord[:, :, : dn_meta["pad_size"], :]
+        outputs_class = outputs_class[:, :, dn_meta["pad_size"] :, :]
+        outputs_coord = outputs_coord[:, :, dn_meta["pad_size"] :, :]
         out = {
-            'pred_logits': output_known_class[-1],
-            'pred_boxes': output_known_coord[-1],
+            "pred_logits": output_known_class[-1],
+            "pred_boxes": output_known_coord[-1],
         }
         if aux_loss:
-            out['aux_outputs'] = _set_aux_loss(output_known_class[:-1], output_known_coord[:-1])
-        dn_meta['output_known_lbs_bboxes'] = out
+            out["aux_outputs"] = _set_aux_loss(output_known_class[:-1], output_known_coord[:-1])
+        dn_meta["output_known_lbs_bboxes"] = out
     return outputs_class, outputs_coord

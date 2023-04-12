@@ -5,7 +5,6 @@ import numpy as np
 
 
 def read_from_file(info, nsweeps=1, root_path=""):
-
     if not os.path.isabs(info["path"]):
         info["path"] = os.path.join(root_path, info["path"])
     with open(info["path"], "rb") as f:
@@ -18,9 +17,7 @@ def read_from_file(info, nsweeps=1, root_path=""):
         sweep_points_list = [points]
         sweep_times_list = [np.zeros((points.shape[0], 1))]
 
-        assert (nsweeps - 1) == len(
-            info["sweeps"]
-        ), "nsweeps {} should be equal to the list length {}.".format(
+        assert (nsweeps - 1) == len(info["sweeps"]), "nsweeps {} should be equal to the list length {}.".format(
             nsweeps, len(info["sweeps"])
         )
 
@@ -79,7 +76,6 @@ def read_single_waymo(obj):
 
 
 def read_single_waymo_sweep(sweep, obj):
-
     points_xyz = obj["lidars"]["points_xyz"]
     points_feature = obj["lidars"]["points_feature"]
 
@@ -90,9 +86,9 @@ def read_single_waymo_sweep(sweep, obj):
     num_points = points_sweep.shape[1]
 
     if sweep["transform_matrix"] is not None:
-        points_sweep[:3, :] = sweep["transform_matrix"].dot(
-            np.vstack((points_sweep[:3, :], np.ones(num_points)))
-        )[:3, :]
+        points_sweep[:3, :] = sweep["transform_matrix"].dot(np.vstack((points_sweep[:3, :], np.ones(num_points))))[
+            :3, :
+        ]
 
     cur_times = sweep["time_lag"] * np.ones((1, points_sweep.shape[1]))
 
@@ -101,32 +97,36 @@ def read_single_waymo_sweep(sweep, obj):
 
 def get_start_result_anno():
     annotations = {}
-    annotations.update({
-        # 'index': None,
-        "name": [],
-        "truncated": [],
-        "occluded": [],
-        "alpha": [],
-        "bbox": [],
-        "dimensions": [],
-        "location": [],
-        "rotation_y": [],
-        "score": [],
-    })
+    annotations.update(
+        {
+            # 'index': None,
+            "name": [],
+            "truncated": [],
+            "occluded": [],
+            "alpha": [],
+            "bbox": [],
+            "dimensions": [],
+            "location": [],
+            "rotation_y": [],
+            "score": [],
+        }
+    )
     return annotations
 
 
 def empty_result_anno():
     annotations = {}
-    annotations.update({
-        "name": np.array([]),
-        "truncated": np.array([]),
-        "occluded": np.array([]),
-        "alpha": np.array([]),
-        "bbox": np.zeros([0, 4]),
-        "dimensions": np.zeros([0, 3]),
-        "location": np.zeros([0, 3]),
-        "rotation_y": np.array([]),
-        "score": np.array([]),
-    })
+    annotations.update(
+        {
+            "name": np.array([]),
+            "truncated": np.array([]),
+            "occluded": np.array([]),
+            "alpha": np.array([]),
+            "bbox": np.zeros([0, 4]),
+            "dimensions": np.zeros([0, 3]),
+            "location": np.zeros([0, 3]),
+            "rotation_y": np.array([]),
+            "score": np.array([]),
+        }
+    )
     return annotations

@@ -17,7 +17,9 @@ class Backbone3d(nn.Module):
         self.extractor = extractor
         self.position_encoding = build_position_encoding(position_encoding, hidden_dim)
         self.out_features = out_features
-        self.num_channels = [extractor.out_channels, ] * len(out_features)
+        self.num_channels = [
+            extractor.out_channels,
+        ] * len(out_features)
 
     def forward(self, voxels, coordinates, num_points_per_voxel, batch_size, input_shape):
         encoded_input = self.reader(voxels, num_points_per_voxel, coordinates)

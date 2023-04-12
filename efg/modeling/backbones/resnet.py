@@ -49,8 +49,7 @@ class ResNetBlockBase(nn.Module):
 
 
 class BasicBlock(ResNetBlockBase):
-    def __init__(self, in_channels, out_channels, *, stride=1, norm="BN", activation=None,
-                 **kwargs):
+    def __init__(self, in_channels, out_channels, *, stride=1, norm="BN", activation=None, **kwargs):
         """
         The standard block type for ResNet18 and ResNet34.
         Args:
@@ -251,7 +250,7 @@ class AVDBottleneckBlock(BottleneckBlock):
             norm=norm,
             activation=activation,
             stride_in_1x1=stride_in_1x1,
-            dilation=dilation
+            dilation=dilation,
         )
 
         self.avd = avd and (stride > 1)
@@ -259,7 +258,7 @@ class AVDBottleneckBlock(BottleneckBlock):
         self.radix = radix
 
         cardinality = num_groups
-        group_width = int(bottleneck_channels * (bottleneck_width / 64.)) * cardinality
+        group_width = int(bottleneck_channels * (bottleneck_width / 64.0)) * cardinality
 
         # The original MSRA ResNet models have stride in the first 1x1 conv
         # The subsequent fb.torch.resnet and Caffe2 ResNe[X]t implementations have
@@ -269,8 +268,9 @@ class AVDBottleneckBlock(BottleneckBlock):
         if in_channels != out_channels and self.avg_down:
             assert self.shortcut is not None
 
-            self.shortcut_avgpool = nn.AvgPool2d(kernel_size=stride, stride=stride,
-                                                 ceil_mode=True, count_include_pad=False)
+            self.shortcut_avgpool = nn.AvgPool2d(
+                kernel_size=stride, stride=stride, ceil_mode=True, count_include_pad=False
+            )
             self.shortcut = Conv2d(
                 in_channels,
                 out_channels,
@@ -282,12 +282,14 @@ class AVDBottleneckBlock(BottleneckBlock):
 
         if self.radix > 1:
             from .splat import SplAtConv2d
+
             self.conv2 = SplAtConv2d(
                 group_width,
                 group_width,
                 kernel_size=3,
                 stride=1 if self.avd else stride_3x3,
-                padding=dilation, dilation=dilation,
+                padding=dilation,
+                dilation=dilation,
                 groups=cardinality,
                 bias=False,
                 radix=self.radix,
@@ -476,8 +478,7 @@ def make_stage(block_class, num_blocks, first_stride, **kwargs):
 
 
 class BasicStem(nn.Module):
-    def __init__(self, in_channels=3, out_channels=64, norm="BN", activation=None,
-                 deep_stem=False, stem_width=32):
+    def __init__(self, in_channels=3, out_channels=64, norm="BN", activation=None, deep_stem=False, stem_width=32):
         """
         Args:
             norm (str or callable): a callable that takes the number of
@@ -588,9 +589,7 @@ class ResNet(Backbone):
             name = "res" + str(i + 2)
             self.add_module(name, stage)
             self.stages_and_names.append((stage, name))
-            self._out_feature_strides[name] = current_stride = int(
-                current_stride * np.prod([k.stride for k in blocks])
-            )
+            self._out_feature_strides[name] = current_stride = int(current_stride * np.prod([k.stride for k in blocks]))
             self._out_feature_channels[name] = blocks[-1].out_channels
 
         if num_classes is not None:
@@ -637,9 +636,7 @@ class ResNet(Backbone):
 
     def output_shape(self):
         return {
-            name: ShapeSpec(
-                channels=self._out_feature_channels[name], stride=self._out_feature_strides[name]
-            )
+            name: ShapeSpec(channels=self._out_feature_channels[name], stride=self._out_feature_strides[name])
             for name in self._out_features
         }
 
@@ -656,8 +653,9 @@ def build_resnet_backbone(config, input_shape):
     deep_stem = config.model.resnets.deep_stem
 
     if not deep_stem:
-        assert getattr(config.model.resnets, "radix", 1) <= 1, \
-            "config.model.resnets.radix: {} > 1".format(config.model.resnets.radix)
+        assert getattr(config.model.resnets, "radix", 1) <= 1, "config.model.resnets.radix: {} > 1".format(
+            config.model.resnets.radix
+        )
 
     # need registration of new blocks/stems?
     norm = config.model.resnets.norm
@@ -702,8 +700,7 @@ def build_resnet_backbone(config, input_shape):
 
     # Avoid creating variables without gradients
     # which consume extra memory and may cause allreduce to fail
-    out_stage_idx = [
-        {"res2": 2, "res3": 3, "res4": 4, "res5": 5, "linear": 5}[f] for f in out_features]
+    out_stage_idx = [{"res2": 2, "res3": 3, "res4": 4, "res5": 5, "linear": 5}[f] for f in out_features]
     max_stage_idx = max(out_stage_idx)
     # Apply Deformable Convolution in stages
     # Specify if apply deform_conv on Res2, Res3, Res4, Res5
@@ -720,13 +717,9 @@ def build_resnet_backbone(config, input_shape):
     logger = logging.getLogger(__name__)
     # See efg/configs/base_detection_config.py for details
     if not stride_in_1x1 and "torchvision" not in config.model.weights:
-        logger.warning(
-            "Using pretrain weight not from torchvision with model.resnets.stride_in_1x1 == False"
-        )
+        logger.warning("Using pretrain weight not from torchvision with model.resnets.stride_in_1x1 == False")
     elif stride_in_1x1 and "torchvision" in config.model.weights and config.model.weights:
-        logger.warning(
-            "Using pretrain weight from torchvision with model.resnets.stride_in_1x1 == True"
-        )
+        logger.warning("Using pretrain weight from torchvision with model.resnets.stride_in_1x1 == True")
 
     in_channels = 2 * stem_width if deep_stem else in_channels
     for idx, stage_idx in enumerate(range(2, max_stage_idx + 1)):
@@ -783,8 +776,6 @@ def build_resnet_backbone(config, input_shape):
                 block.freeze()
         stages.append(blocks)
 
-    return ResNet(stem,
-                  stages,
-                  num_classes=num_classes,
-                  out_features=out_features,
-                  zero_init_residual=zero_init_residual)
+    return ResNet(
+        stem, stages, num_classes=num_classes, out_features=out_features, zero_init_residual=zero_init_residual
+    )

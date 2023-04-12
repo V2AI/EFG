@@ -8,10 +8,11 @@ from itertools import zip_longest
 from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+
 import torch
 
-from .utils import Device, make_device
 from . import utils as struct_utils
+from .utils import Device, make_device
 
 
 class Pointclouds:
@@ -194,9 +195,7 @@ class Pointclouds:
                     if p.device != self.device:
                         raise ValueError("All points must be on the same device")
 
-                num_points_per_cloud = torch.tensor(
-                    [len(p) for p in self._points_list], device=self.device
-                )
+                num_points_per_cloud = torch.tensor([len(p) for p in self._points_list], device=self.device)
                 self._P = int(num_points_per_cloud.max())
                 self.valid = torch.tensor(
                     [len(p) > 0 for p in self._points_list],
@@ -218,9 +217,7 @@ class Pointclouds:
             self._P = self._points_padded.shape[1]
             self.device = self._points_padded.device
             self.valid = torch.ones((self._N,), dtype=torch.bool, device=self.device)
-            self._num_points_per_cloud = torch.tensor(
-                [self._P] * self._N, device=self.device
-            )
+            self._num_points_per_cloud = torch.tensor([self._P] * self._N, device=self.device)
             self.equisized = True
         else:
             raise ValueError(
@@ -279,9 +276,7 @@ class Pointclouds:
                     number of points in each cloud."
                 )
             if aux_input.device != self.device:
-                raise ValueError(
-                    "All auxiliary inputs must be on the same device as the points."
-                )
+                raise ValueError("All auxiliary inputs must be on the same device as the points.")
             aux_input_C = aux_input.shape[2]
             return None, aux_input, aux_input_C
         else:
@@ -291,9 +286,7 @@ class Pointclouds:
                     points in a cloud."
             )
 
-    def _parse_auxiliary_input_list(
-        self, aux_input: list
-    ) -> Tuple[Optional[List[torch.Tensor]], None, Optional[int]]:
+    def _parse_auxiliary_input_list(self, aux_input: list) -> Tuple[Optional[List[torch.Tensor]], None, Optional[int]]:
         """
         Interpret the auxiliary inputs (normals, features) given to __init__,
         if a list.
@@ -319,21 +312,15 @@ class Pointclouds:
             valid_but_empty = p == 0 and d is not None and d.ndim == 2
             if p > 0 or valid_but_empty:
                 if p != d.shape[0]:
-                    raise ValueError(
-                        "A cloud has mismatched numbers of points and inputs"
-                    )
+                    raise ValueError("A cloud has mismatched numbers of points and inputs")
                 if d.dim() != 2:
-                    raise ValueError(
-                        "A cloud auxiliary input must be of shape PxC or empty"
-                    )
+                    raise ValueError("A cloud auxiliary input must be of shape PxC or empty")
                 if aux_input_C is None:
                     aux_input_C = d.shape[1]
                 elif aux_input_C != d.shape[1]:
                     raise ValueError("The clouds must have the same number of channels")
                 if d.device != self.device:
-                    raise ValueError(
-                        "All auxiliary inputs must be on the same device as the points."
-                    )
+                    raise ValueError("All auxiliary inputs must be on the same device as the points.")
             else:
                 needs_fixing = True
 
@@ -429,14 +416,10 @@ class Pointclouds:
             list of tensors of points of shape (P_n, 3).
         """
         if self._points_list is None:
-            assert (
-                self._points_padded is not None
-            ), "points_padded is required to compute points_list."
+            assert self._points_padded is not None, "points_padded is required to compute points_list."
             points_list = []
             for i in range(self._N):
-                points_list.append(
-                    self._points_padded[i, : self.num_points_per_cloud()[i]]
-                )
+                points_list.append(self._points_padded[i, : self.num_points_per_cloud()[i]])
             self._points_list = points_list
         return self._points_list
 
@@ -452,9 +435,7 @@ class Pointclouds:
             if self._normals_padded is None:
                 # No normals provided so return None
                 return None
-            self._normals_list = struct_utils.padded_to_list(
-                self._normals_padded, self.num_points_per_cloud().tolist()
-            )
+            self._normals_list = struct_utils.padded_to_list(self._normals_padded, self.num_points_per_cloud().tolist())
         return self._normals_list
 
     def features_list(self) -> Optional[List[torch.Tensor]]:
@@ -667,15 +648,9 @@ class Pointclouds:
         normals_list = self.normals_list()
         features_list = self.features_list()
         if self.isempty():
-            self._points_packed = torch.zeros(
-                (0, 3), dtype=torch.float32, device=self.device
-            )
-            self._packed_to_cloud_idx = torch.zeros(
-                (0,), dtype=torch.int64, device=self.device
-            )
-            self._cloud_to_packed_first_idx = torch.zeros(
-                (0,), dtype=torch.int64, device=self.device
-            )
+            self._points_packed = torch.zeros((0, 3), dtype=torch.float32, device=self.device)
+            self._packed_to_cloud_idx = torch.zeros((0,), dtype=torch.int64, device=self.device)
+            self._cloud_to_packed_first_idx = torch.zeros((0,), dtype=torch.int64, device=self.device)
             self._normals_packed = None
             self._features_packed = None
             return
@@ -723,9 +698,7 @@ class Pointclouds:
                 new_normals = self.normals_padded().clone()
             if features_padded is not None:
                 new_features = self.features_padded().clone()
-        other = self.__class__(
-            points=new_points, normals=new_normals, features=new_features
-        )
+        other = self.__class__(points=new_points, normals=new_normals, features=new_features)
         for k in self._INTERNAL_TENSORS:
             v = getattr(self, k)
             if torch.is_tensor(v):
@@ -759,9 +732,7 @@ class Pointclouds:
                 new_normals = self.normals_padded().detach()
             if features_padded is not None:
                 new_features = self.features_padded().detach()
-        other = self.__class__(
-            points=new_points, normals=new_normals, features=new_features
-        )
+        other = self.__class__(points=new_points, normals=new_normals, features=new_features)
         for k in self._INTERNAL_TENSORS:
             v = getattr(self, k)
             if torch.is_tensor(v):
@@ -859,7 +830,7 @@ class Pointclouds:
         cloudlist = []
         curi = 0
         for i in split_sizes:
-            cloudlist.append(self[curi: curi + i])
+            cloudlist.append(self[curi : curi + i])
             curi += i
         return cloudlist
 
@@ -879,9 +850,7 @@ class Pointclouds:
         if offsets_packed.shape != points_packed.shape:
             raise ValueError("Offsets must have dimension (all_p, 3).")
         self._points_packed = points_packed + offsets_packed
-        new_points_list = list(
-            self._points_packed.split(self.num_points_per_cloud().tolist(), 0)
-        )
+        new_points_list = list(self._points_packed.split(self.num_points_per_cloud().tolist(), 0))
         # Note that since _compute_packed() has been executed, points_list
         # cannot be None even if not provided during construction.
         self._points_list = new_points_list
@@ -919,10 +888,7 @@ class Pointclouds:
             max_points = [max_points] * len(self)
         elif len(max_points) != len(self):
             raise ValueError("wrong number of max_points supplied")
-        if all(
-            int(n_points) <= int(max_)
-            for n_points, max_ in zip(self.num_points_per_cloud(), max_points)
-        ):
+        if all(int(n_points) <= int(max_) for n_points, max_ in zip(self.num_points_per_cloud(), max_points)):
             return self
 
         points_list = []
@@ -1092,13 +1058,9 @@ class Pointclouds:
             new_features_list = []
             for features in features_list:
                 new_features_list.extend(features.clone() for _ in range(N))
-        return self.__class__(
-            points=new_points_list, normals=new_normals_list, features=new_features_list
-        )
+        return self.__class__(points=new_points_list, normals=new_normals_list, features=new_features_list)
 
-    def update_padded(
-        self, new_points_padded, new_normals_padded=None, new_features_padded=None
-    ):
+    def update_padded(self, new_points_padded, new_normals_padded=None, new_features_padded=None):
         """
         Returns a Pointcloud structure with updated padded tensors and copies of
         the auxiliary tensors. This function allows for an update of
@@ -1121,9 +1083,7 @@ class Pointclouds:
                 raise ValueError("new values must have the same number of points.")
             if size[2] is not None:
                 if x.shape[2] != size[2]:
-                    raise ValueError(
-                        "new values must have the same number of channels."
-                    )
+                    raise ValueError("new values must have the same number of channels.")
 
         check_shapes(new_points_padded, [self._N, self._P, 3])
         if new_normals_padded is not None:
@@ -1200,9 +1160,7 @@ class Pointclouds:
             raise ValueError("Input box must be of shape (2, 3) or (N, 2, 3).")
 
         if box.dim() == 3 and box.shape[0] != 1 and box.shape[0] != self._N:
-            raise ValueError(
-                "Input box dimension is incompatible with pointcloud size."
-            )
+            raise ValueError("Input box dimension is incompatible with pointcloud size.")
 
         if box.dim() == 2:
             box = box[None]
@@ -1217,9 +1175,7 @@ class Pointclouds:
             box = box.expand(sumP, 2, 3)
         elif box.shape[0] == self._N:
             box = box.unbind(0)
-            box = [
-                b.expand(p, 2, 3) for (b, p) in zip(box, self.num_points_per_cloud())
-            ]
+            box = [b.expand(p, 2, 3) for (b, p) in zip(box, self.num_points_per_cloud())]
             box = torch.cat(box, 0)
 
         coord_inside = (points_packed >= box[:, 0]) * (points_packed <= box[:, 1])
@@ -1252,8 +1208,7 @@ def join_pointclouds_as_batch(pointclouds: Sequence[Pointclouds]) -> Pointclouds
                 raise ValueError("Pointclouds cannot have their points set to None!")
             if not all(f is None for f in field_list):
                 raise ValueError(
-                    f"Pointclouds in the batch have some fields '{field}'"
-                    + " defined and some set to None."
+                    f"Pointclouds in the batch have some fields '{field}'" + " defined and some set to None."
                 )
             field_list = None
         else:

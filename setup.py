@@ -32,12 +32,12 @@ def get_extensions():
     sources = [main_source] + sources
     extension = CppExtension
 
-    extra_compile_args = {"cxx": ['-g', '-fopenmp']}
+    extra_compile_args = {"cxx": ["-g", "-fopenmp"]}
     define_macros = []
 
-    if (
-        torch.cuda.is_available() and CUDA_HOME is not None and os.path.isdir(CUDA_HOME)
-    ) or os.getenv("FORCE_CUDA", "0") == "1":
+    if (torch.cuda.is_available() and CUDA_HOME is not None and os.path.isdir(CUDA_HOME)) or os.getenv(
+        "FORCE_CUDA", "0"
+    ) == "1":
         extension = CUDAExtension
         sources += source_cuda
         define_macros += [("WITH_CUDA", None)]

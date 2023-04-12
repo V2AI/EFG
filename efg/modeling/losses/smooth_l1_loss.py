@@ -1,11 +1,7 @@
 import torch
 
 
-def smooth_l1_loss(input,
-                   target,
-                   beta: float,
-                   reduction: str = "none",
-                   size_average=False):
+def smooth_l1_loss(input, target, beta: float, reduction: str = "none", size_average=False):
     """
     Smooth L1 loss defined in the Fast R-CNN paper as:
                   | 0.5 * x ** 2 / beta   if abs(x) < beta
@@ -43,7 +39,7 @@ def smooth_l1_loss(input,
         implement Smooth L1 loss, nor does it implement Huber loss. It implements
         the special case of both in which they are equal (beta=1).
         See: https://pytorch.org/docs/stable/nn.html#torch.nn.SmoothL1Loss.
-     """
+    """
     if beta < 1e-5:
         # if beta == 0, then torch.where will result in nan gradients when
         # the chain rule is applied due to pytorch implementation details

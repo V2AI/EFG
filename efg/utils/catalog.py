@@ -28,9 +28,7 @@ class ModelCatalog(object):
         "FAIR/X-152-32x8d-IN5k": "ImageNetPretrained/25093814/X-152-32x8d-IN5k.pkl",
     }
 
-    D2_DETECTRON_PATH_FORMAT = (
-        "{prefix}/{url}/output/train/{dataset}/{type}/model_final.pkl"
-    )  # noqa B950
+    D2_DETECTRON_PATH_FORMAT = "{prefix}/{url}/output/train/{dataset}/{type}/model_final.pkl"  # noqa B950
 
     D2_DATASET_COCO = "coco_2014_train%3Acoco_2014_valminusminival"
     D2_DATASET_COCO_KEYPOINTS = "keypoints_coco_2014_train%3Akeypoints_coco_2014_valminusminival"
@@ -63,14 +61,14 @@ class ModelCatalog(object):
     @staticmethod
     def _get_c2_imagenet_pretrained(name):
         prefix = ModelCatalog.S3_D2_DETECTRON_PREFIX
-        name = name[len("ImageNetPretrained/"):]
+        name = name[len("ImageNetPretrained/") :]
         name = ModelCatalog.D2_IMAGENET_MODELS[name]
         url = "/".join([prefix, name])
         return url
 
     @staticmethod
     def _get_c2_detectron_baseline(name):
-        name = name[len("Caffe2Detectron/COCO/"):]
+        name = name[len("Caffe2Detectron/COCO/") :]
         url = ModelCatalog.D2_DETECTRON_MODELS[name]
         if "keypoint_rcnn" in name:
             dataset = ModelCatalog.D2_DATASET_COCO_KEYPOINTS
@@ -102,7 +100,7 @@ class ModelCatalogHandler(PathHandler):
 
     def _get_local_path(self, path):
         logger = logging.getLogger(__name__)
-        catalog_path = ModelCatalog.get(path[len(self.PREFIX):])
+        catalog_path = ModelCatalog.get(path[len(self.PREFIX) :])
         logger.info("Catalog entry {} points to {}".format(path, catalog_path))
         return PathManager.get_local_path(catalog_path)
 
@@ -122,7 +120,7 @@ class Detectron2Handler(PathHandler):
         return [self.PREFIX]
 
     def _get_local_path(self, path):
-        name = path[len(self.PREFIX):]
+        name = path[len(self.PREFIX) :]
         return PathManager.get_local_path(self.S3_DETECTRON2_PREFIX + name)
 
     def _open(self, path, mode="r", **kwargs):

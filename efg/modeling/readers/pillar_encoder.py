@@ -29,7 +29,6 @@ class PFNLayer(nn.Module):
         self.norm = get_norm(norm, self.units)
 
     def forward(self, inputs):
-
         x = self.linear(inputs)
         torch.backends.cudnn.enabled = False
         x = self.norm(x.permute(0, 2, 1).contiguous()).permute(0, 2, 1).contiguous()
@@ -87,9 +86,7 @@ class PillarFeatureNet(nn.Module):
                 last_layer = False
             else:
                 last_layer = True
-            pfn_layers.append(
-                PFNLayer(in_filters, out_filters, norm=norm, last_layer=last_layer)
-            )
+            pfn_layers.append(PFNLayer(in_filters, out_filters, norm=norm, last_layer=last_layer))
         self.pfn_layers = nn.ModuleList(pfn_layers)
 
         # Need pillar (voxel) size and x/y offset in order to calculate pillar offset
@@ -105,20 +102,14 @@ class PillarFeatureNet(nn.Module):
 
         # Find distance of x, y, and z from cluster center
         # features = features[:, :, :self.num_input]
-        points_mean = features[:, :, :3].sum(dim=1, keepdim=True) / num_voxels.type_as(
-            features
-        ).view(-1, 1, 1)
+        points_mean = features[:, :, :3].sum(dim=1, keepdim=True) / num_voxels.type_as(features).view(-1, 1, 1)
         f_cluster = features[:, :, :3] - points_mean
 
         # Find distance of x, y, and z from pillar center
         # f_center = features[:, :, :2]
         f_center = torch.zeros_like(features[:, :, :2])
-        f_center[:, :, 0] = features[:, :, 0] - (
-            coors[:, 3].to(dtype).unsqueeze(1) * self.vx + self.x_offset
-        )
-        f_center[:, :, 1] = features[:, :, 1] - (
-            coors[:, 2].to(dtype).unsqueeze(1) * self.vy + self.y_offset
-        )
+        f_center[:, :, 0] = features[:, :, 0] - (coors[:, 3].to(dtype).unsqueeze(1) * self.vx + self.x_offset)
+        f_center[:, :, 1] = features[:, :, 1] - (coors[:, 2].to(dtype).unsqueeze(1) * self.vy + self.y_offset)
 
         # Combine together feature decorations
         features_ls = [features, f_cluster, f_center]
@@ -143,9 +134,7 @@ class PillarFeatureNet(nn.Module):
 
 @BACKBONES.register()
 class PointPillarsScatter(nn.Module):
-    def __init__(
-        self, num_input_features=64, norm="BN1d", **kwargs
-    ):
+    def __init__(self, num_input_features=64, norm="BN1d", **kwargs):
         """
         Point Pillar's Scatter.
         Converts learned features from dense tensor to sparse pseudo image. This replaces SECOND's
@@ -158,7 +147,6 @@ class PointPillarsScatter(nn.Module):
         self.nchannels = num_input_features
 
     def forward(self, voxel_features, coords, batch_size, input_shape):
-
         self.nx = input_shape[0]
         self.ny = input_shape[1]
 

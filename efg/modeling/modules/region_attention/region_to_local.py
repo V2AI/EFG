@@ -13,21 +13,20 @@ from timm.models.vision_transformer import Mlp
 
 
 class R2LAttentionPlusFFN(nn.Module):
-
     def __init__(
         self,
         input_channels,
         dim_hidden,
         kernel_size,
         num_heads,
-        mlp_ratio=1.,
+        mlp_ratio=1.0,
         qkv_bias=False,
         qk_scale=None,
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
-        attn_drop=0.,
-        drop=0.,
-        cls_attn=True
+        attn_drop=0.0,
+        drop=0.0,
+        cls_attn=True,
     ):
         super().__init__()
 
@@ -49,7 +48,7 @@ class R2LAttentionPlusFFN(nn.Module):
             attn_drop=attn_drop,
             proj_drop=drop,
             attn_map_dim=(kernel_size[0][0], kernel_size[0][1]),
-            num_cls_tokens=1
+            num_cls_tokens=1,
         )
         self.norm2 = norm_layer(input_channels)
         self.mlp = Mlp(
@@ -57,14 +56,14 @@ class R2LAttentionPlusFFN(nn.Module):
             hidden_features=int(dim_hidden * mlp_ratio),
             out_features=dim_hidden,
             act_layer=act_layer,
-            drop=drop
+            drop=drop,
         )
 
-        self.expand = nn.Sequential(
-            norm_layer(input_channels),
-            act_layer(),
-            nn.Linear(input_channels, dim_hidden)
-        ) if input_channels != dim_hidden else None
+        self.expand = (
+            nn.Sequential(norm_layer(input_channels), act_layer(), nn.Linear(input_channels, dim_hidden))
+            if input_channels != dim_hidden
+            else None
+        )
 
         self.linear = nn.Linear(dim_hidden, input_channels)
 
@@ -92,11 +91,11 @@ class R2LAttentionPlusFFN(nn.Module):
 
 
 class Projection(nn.Module):
-    def __init__(self, input_channels, output_channels, act_layer, mode='sc'):
+    def __init__(self, input_channels, output_channels, act_layer, mode="sc"):
         super().__init__()
         tmp = []
-        if 'c' in mode:
-            ks = 2 if 's' in mode else 1
+        if "c" in mode:
+            ks = 2 if "s" in mode else 1
             if ks == 2:
                 stride = ks
                 ks = ks + 1
@@ -108,10 +107,12 @@ class Projection(nn.Module):
             if input_channels == output_channels and ks == 1:
                 tmp.append(nn.Identity())
             else:
-                tmp.extend([
-                    LayerNorm2d(input_channels),
-                    act_layer(),
-                ])
+                tmp.extend(
+                    [
+                        LayerNorm2d(input_channels),
+                        act_layer(),
+                    ]
+                )
                 tmp.append(
                     nn.Conv2d(
                         in_channels=input_channels,
@@ -119,7 +120,7 @@ class Projection(nn.Module):
                         kernel_size=ks,
                         stride=stride,
                         padding=padding,
-                        groups=input_channels
+                        groups=input_channels,
                     )
                 )
 
@@ -153,8 +154,9 @@ def convert_to_flatten_layout(cls_tokens, patch_tokens, ws):
     B, C, H, W = patch_tokens.shape
     kernel_size = (H // H_ks, W // W_ks)
     tmp = F.unfold(patch_tokens, kernel_size=kernel_size, stride=kernel_size, padding=(0, 0))  # Nx(Cxksxks)x(H/sxK/s)
-    patch_tokens = tmp.transpose(1, 2).reshape(
-        -1, C, kernel_size[0] * kernel_size[1]).transpose(-2, -1)  # (NxH/sxK/s)x(ksxks)xC
+    patch_tokens = (
+        tmp.transpose(1, 2).reshape(-1, C, kernel_size[0] * kernel_size[1]).transpose(-2, -1)
+    )  # (NxH/sxK/s)x(ksxks)xC
 
     if need_mask:
         BH_sK_s, ksks, C = patch_tokens.shape
@@ -162,19 +164,19 @@ def convert_to_flatten_layout(cls_tokens, patch_tokens, ws):
         mask = torch.ones(BH_sK_s // B, 1 + ksks, 1 + ksks, device=patch_tokens.device, dtype=torch.float)
         right = torch.zeros(1 + ksks, 1 + ksks, device=patch_tokens.device, dtype=torch.float)
         tmp = torch.zeros(ws, ws, device=patch_tokens.device, dtype=torch.float)
-        tmp[0:(ws - p_r), 0:(ws - p_r)] = 1.
+        tmp[0 : (ws - p_r), 0 : (ws - p_r)] = 1.0
         tmp = tmp.repeat(ws, ws)
         right[1:, 1:] = tmp
         right[0, 0] = 1
-        right[0, 1:] = torch.tensor([1.] * (ws - p_r) + [0.] * p_r).repeat(ws).to(right.device)
-        right[1:, 0] = torch.tensor([1.] * (ws - p_r) + [0.] * p_r).repeat(ws).to(right.device)
+        right[0, 1:] = torch.tensor([1.0] * (ws - p_r) + [0.0] * p_r).repeat(ws).to(right.device)
+        right[1:, 0] = torch.tensor([1.0] * (ws - p_r) + [0.0] * p_r).repeat(ws).to(right.device)
         bottom = torch.zeros_like(right)
-        bottom[0:ws * (ws - p_b) + 1, 0:ws * (ws - p_b) + 1] = 1.
+        bottom[0 : ws * (ws - p_b) + 1, 0 : ws * (ws - p_b) + 1] = 1.0
         bottom_right = copy.deepcopy(right)
-        bottom_right[0:ws * (ws - p_b) + 1, 0:ws * (ws - p_b) + 1] = 1.
+        bottom_right[0 : ws * (ws - p_b) + 1, 0 : ws * (ws - p_b) + 1] = 1.0
 
-        mask[W_s - 1:(H_s - 1) * W_s:W_s, ...] = right
-        mask[(H_s - 1) * W_s:, ...] = bottom
+        mask[W_s - 1 : (H_s - 1) * W_s : W_s, ...] = right
+        mask[(H_s - 1) * W_s :, ...] = bottom
         mask[-1, ...] = bottom_right
         mask = mask.repeat(B, 1, 1)
     else:

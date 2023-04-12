@@ -45,15 +45,7 @@ def giou_loss(preds: Tensor, target: Tensor) -> Tensor:
     return loss
 
 
-def iou_loss_v2(
-    inputs,
-    targets,
-    weight=None,
-    box_mode="xyxy",
-    loss_type="iou",
-    smooth=False,
-    reduction="none"
-):
+def iou_loss_v2(inputs, targets, weight=None, box_mode="xyxy", loss_type="iou", smooth=False, reduction="none"):
     """
     Compute iou loss of type ['iou', 'giou', 'linear_iou']
 
@@ -76,15 +68,15 @@ def iou_loss_v2(
 
     eps = torch.finfo(torch.float32).eps
 
-    inputs_area = (inputs[..., 2] - inputs[..., 0]).clamp_(min=0) \
-        * (inputs[..., 3] - inputs[..., 1]).clamp_(min=0)
-    targets_area = (targets[..., 2] - targets[..., 0]).clamp_(min=0) \
-        * (targets[..., 3] - targets[..., 1]).clamp_(min=0)
+    inputs_area = (inputs[..., 2] - inputs[..., 0]).clamp_(min=0) * (inputs[..., 3] - inputs[..., 1]).clamp_(min=0)
+    targets_area = (targets[..., 2] - targets[..., 0]).clamp_(min=0) * (targets[..., 3] - targets[..., 1]).clamp_(min=0)
 
-    w_intersect = (torch.min(inputs[..., 2], targets[..., 2])
-                   - torch.max(inputs[..., 0], targets[..., 0])).clamp_(min=0)
-    h_intersect = (torch.min(inputs[..., 3], targets[..., 3])
-                   - torch.max(inputs[..., 1], targets[..., 1])).clamp_(min=0)
+    w_intersect = (torch.min(inputs[..., 2], targets[..., 2]) - torch.max(inputs[..., 0], targets[..., 0])).clamp_(
+        min=0
+    )
+    h_intersect = (torch.min(inputs[..., 3], targets[..., 3]) - torch.max(inputs[..., 1], targets[..., 1])).clamp_(
+        min=0
+    )
 
     area_intersect = w_intersect * h_intersect
     area_union = targets_area + inputs_area - area_intersect
@@ -98,10 +90,8 @@ def iou_loss_v2(
     elif loss_type == "linear_iou":
         loss = 1 - ious
     elif loss_type == "giou":
-        g_w_intersect = torch.max(inputs[..., 2], targets[..., 2]) \
-            - torch.min(inputs[..., 0], targets[..., 0])
-        g_h_intersect = torch.max(inputs[..., 3], targets[..., 3]) \
-            - torch.min(inputs[..., 1], targets[..., 1])
+        g_w_intersect = torch.max(inputs[..., 2], targets[..., 2]) - torch.min(inputs[..., 0], targets[..., 0])
+        g_h_intersect = torch.max(inputs[..., 3], targets[..., 3]) - torch.min(inputs[..., 1], targets[..., 1])
         ac_uion = g_w_intersect * g_h_intersect
         gious = ious - (ac_uion - area_union) / ac_uion.clamp(min=eps)
         loss = 1 - gious

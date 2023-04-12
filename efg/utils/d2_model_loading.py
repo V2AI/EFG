@@ -88,9 +88,7 @@ def convert_c2_detectron_names(weights):
     # FPN case
     # In the C2 model, the RPN hidden layer conv is defined for FPN level 2 and then
     # shared for all other levels, hence the appearance of "fpn2"
-    layer_keys = [
-        k.replace("conv.rpn.fpn2", "proposal_generator.rpn_head.conv") for k in layer_keys
-    ]
+    layer_keys = [k.replace("conv.rpn.fpn2", "proposal_generator.rpn_head.conv") for k in layer_keys]
     # Non-FPN case
     layer_keys = [k.replace("conv.rpn", "proposal_generator.rpn_head.conv") for k in layer_keys]
 
@@ -98,22 +96,11 @@ def convert_c2_detectron_names(weights):
     # RPN box transformation conv
     # --------------------------------------------------------------------------
     # FPN case (see note above about "fpn2")
-    layer_keys = [
-        k.replace("rpn.bbox.pred.fpn2", "proposal_generator.rpn_head.anchor_deltas")
-        for k in layer_keys
-    ]
-    layer_keys = [
-        k.replace("rpn.cls.logits.fpn2", "proposal_generator.rpn_head.objectness_logits")
-        for k in layer_keys
-    ]
+    layer_keys = [k.replace("rpn.bbox.pred.fpn2", "proposal_generator.rpn_head.anchor_deltas") for k in layer_keys]
+    layer_keys = [k.replace("rpn.cls.logits.fpn2", "proposal_generator.rpn_head.objectness_logits") for k in layer_keys]
     # Non-FPN case
-    layer_keys = [
-        k.replace("rpn.bbox.pred", "proposal_generator.rpn_head.anchor_deltas") for k in layer_keys
-    ]
-    layer_keys = [
-        k.replace("rpn.cls.logits", "proposal_generator.rpn_head.objectness_logits")
-        for k in layer_keys
-    ]
+    layer_keys = [k.replace("rpn.bbox.pred", "proposal_generator.rpn_head.anchor_deltas") for k in layer_keys]
+    layer_keys = [k.replace("rpn.cls.logits", "proposal_generator.rpn_head.objectness_logits") for k in layer_keys]
 
     # --------------------------------------------------------------------------
     # Fast R-CNN box head
@@ -142,11 +129,11 @@ def convert_c2_detectron_names(weights):
         norm = ".norm" if "norm" in splits else ""
         if name.startswith("fpn.inner."):
             # splits example: ['fpn', 'inner', 'res2', '2', 'sum', 'lateral', 'weight']
-            stage = int(splits[2][len("res"):])
+            stage = int(splits[2][len("res") :])
             return "fpn_lateral{}{}.{}".format(stage, norm, splits[-1])
         elif name.startswith("fpn.res"):
             # splits example: ['fpn', 'res2', '2', 'sum', 'weight']
-            stage = int(splits[1][len("res"):])
+            stage = int(splits[1][len("res") :])
             return "fpn_output{}{}.{}".format(stage, norm, splits[-1])
         return name
 
@@ -167,9 +154,7 @@ def convert_c2_detectron_names(weights):
     # --------------------------------------------------------------------------
     # interestingly, the keypoint head convs have blob names that are simply "conv_fcnX"
     layer_keys = [k.replace("conv.fcn", "roi_heads.keypoint_head.conv_fcn") for k in layer_keys]
-    layer_keys = [
-        k.replace("kps.score.lowres", "roi_heads.keypoint_head.score_lowres") for k in layer_keys
-    ]
+    layer_keys = [k.replace("kps.score.lowres", "roi_heads.keypoint_head.score_lowres") for k in layer_keys]
     layer_keys = [k.replace("kps.score.", "roi_heads.keypoint_head.score.") for k in layer_keys]
 
     # --------------------------------------------------------------------------
@@ -188,9 +173,7 @@ def convert_c2_detectron_names(weights):
             new_weights[renamed] = weights[orig][new_start_idx:]
             logger.info(
                 "Remove prediction weight for background class in {}. The shape changes from "
-                "{} to {}.".format(
-                    renamed, tuple(weights[orig].shape), tuple(new_weights[renamed].shape)
-                )
+                "{} to {}.".format(renamed, tuple(weights[orig].shape), tuple(new_weights[renamed].shape))
             )
         elif renamed.startswith("cls_score."):
             # move weights of bg class from original index 0 to last index
@@ -271,11 +254,7 @@ def align_and_update_state_dicts(model_state_dict, ckpt_state_dict, c2_conversio
                     key_ckpt, value_ckpt.shape, key_model, shape_in_model
                 )
             )
-            logger.warning(
-                "{} will not be loaded. Please double check and see if this is desired.".format(
-                    key_ckpt
-                )
-            )
+            logger.warning("{} will not be loaded. Please double check and see if this is desired.".format(key_ckpt))
             continue
 
         model_state_dict[key_model] = value_ckpt.clone()
@@ -307,6 +286,4 @@ def align_and_update_state_dicts(model_state_dict, ckpt_state_dict, c2_conversio
 
     unmatched_ckpt_keys = [k for k in ckpt_keys if k not in matched_ckpt_keys]
     if len(unmatched_ckpt_keys):
-        logger.info(
-            get_unexpected_parameters_message(original_keys[x] for x in unmatched_ckpt_keys)
-        )
+        logger.info(get_unexpected_parameters_message(original_keys[x] for x in unmatched_ckpt_keys))

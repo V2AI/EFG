@@ -16,13 +16,13 @@ from efg.data.registry import DATASETS
 logger = logging.getLogger(__name__)
 
 CAT_TO_IDX = {
-    'UNKNOWN': 0,
-    'VEHICLE': 1,
-    'PEDESTRIAN': 2,
-    'SIGN': 3,
-    'CYCLIST': 4,
+    "UNKNOWN": 0,
+    "VEHICLE": 1,
+    "PEDESTRIAN": 2,
+    "SIGN": 3,
+    "CYCLIST": 4,
 }
-IDX_TO_CAT = ['UNKNOWN', 'VEHICLE', 'PEDESTRIAN', 'SIGN', 'CYCLIST']
+IDX_TO_CAT = ["UNKNOWN", "VEHICLE", "PEDESTRIAN", "SIGN", "CYCLIST"]
 # ignore sign class
 LABEL_TO_TYPE = {1: 1, 2: 2, 3: 4}
 
@@ -56,18 +56,17 @@ class WaymoDetectionDataset(BaseDataset):
     def load_infos(self):
         with open(self.info_path, "rb") as f:
             waymo_infos_all = pickle.load(f)
-        return waymo_infos_all[::self.load_interval]
+        return waymo_infos_all[:: self.load_interval]
 
     def __len__(self):
         return len(self.dataset_dicts)
 
     def __getitem__(self, idx):
-
         info = deepcopy(self.dataset_dicts[idx])
         # load point cloud data
         if not os.path.isabs(info["path"]):
             info["path"] = os.path.join(self.root_path, info["path"])
-        with open(info["path"], 'rb') as f:
+        with open(info["path"], "rb") as f:
             obj = pickle.load(f)
 
         points = read_single_waymo(obj)
@@ -102,7 +101,6 @@ class WaymoDetectionDataset(BaseDataset):
         }
 
         if not self.is_test:
-
             if "annotations" not in info:
                 info["annotations"] = {
                     "gt_boxes": info.pop("gt_boxes").astype(np.float32),
@@ -130,9 +128,11 @@ class WaymoDetectionDataset(BaseDataset):
         _dict_select(target, keep)
 
     def _add_class_labels_to_annos(self, info):
-        info["annotations"]["labels"] = np.array(
-            [self.class_names.index(name) + 1 for name in info["annotations"]["gt_names"]]
-        ).astype(np.int64).reshape(-1)
+        info["annotations"]["labels"] = (
+            np.array([self.class_names.index(name) + 1 for name in info["annotations"]["gt_names"]])
+            .astype(np.int64)
+            .reshape(-1)
+        )
 
 
 def collate(batch_list, device):
@@ -152,7 +152,7 @@ def collate(batch_list, device):
                 max_gt = max(max_gt, len(elems[k]))
                 batch_gt_boxes3d = np.zeros((batch_size, max_gt, *elems[0].shape[1:]), dtype=elems[0].dtype)
             for i in range(batch_size):
-                batch_gt_boxes3d[i, :len(elems[i])] = elems[i]
+                batch_gt_boxes3d[i, : len(elems[i])] = elems[i]
             if key != "gt_names":
                 batch_gt_boxes3d = torch.tensor(batch_gt_boxes3d, device=device)
             ret[key] = batch_gt_boxes3d

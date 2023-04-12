@@ -67,9 +67,7 @@ class Conv2d(torch.nn.Conv2d):
     def forward(self, x):
         if x.numel() == 0 and self.training:
             # https://github.com/pytorch/pytorch/issues/12013
-            assert not isinstance(
-                self.norm, torch.nn.SyncBatchNorm
-            ), "SyncBatchNorm does not support empty inputs!"
+            assert not isinstance(self.norm, torch.nn.SyncBatchNorm), "SyncBatchNorm does not support empty inputs!"
 
         if x.numel() == 0 and TORCH_VERSION <= (1, 4):
             assert not isinstance(
@@ -81,9 +79,7 @@ class Conv2d(torch.nn.Conv2d):
             # This computes the height and width of the output tensor
             output_shape = [
                 (i + 2 * p - (di * (k - 1) + 1)) // s + 1
-                for i, p, di, k, s in zip(
-                    x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride
-                )
+                for i, p, di, k, s in zip(x.shape[-2:], self.padding, self.dilation, self.kernel_size, self.stride)
             ]
             output_shape = [x.shape[0], self.weight.shape[0]] + output_shape
             empty = _NewEmptyTensorOp.apply(x, output_shape)
@@ -166,12 +162,8 @@ class Conv2dSamePadding(torch.nn.Conv2d):
                 output_h = math.ceil(input_h / stride_h)
                 output_w = math.ceil(input_w / stride_w)
 
-                padding_needed_h = max(
-                    0, (output_h - 1) * stride_h + (kernel_size_h - 1) * dilation_h + 1 - input_h
-                )
-                padding_needed_w = max(
-                    0, (output_w - 1) * stride_w + (kernel_size_w - 1) * dilation_w + 1 - input_w
-                )
+                padding_needed_h = max(0, (output_h - 1) * stride_h + (kernel_size_h - 1) * dilation_h + 1 - input_h)
+                padding_needed_w = max(0, (output_w - 1) * stride_w + (kernel_size_w - 1) * dilation_w + 1 - input_w)
 
                 left = padding_needed_w // 2
                 right = padding_needed_w - left
@@ -235,12 +227,8 @@ class MaxPool2dSamePadding(torch.nn.MaxPool2d):
                 output_h = math.ceil(input_h / stride_h)
                 output_w = math.ceil(input_w / stride_w)
 
-                padding_needed_h = max(
-                    0, (output_h - 1) * stride_h + (kernel_size_h - 1) + 1 - input_h
-                )
-                padding_needed_w = max(
-                    0, (output_w - 1) * stride_w + (kernel_size_w - 1) + 1 - input_w
-                )
+                padding_needed_h = max(0, (output_h - 1) * stride_h + (kernel_size_h - 1) + 1 - input_h)
+                padding_needed_w = max(0, (output_w - 1) * stride_w + (kernel_size_w - 1) + 1 - input_w)
 
                 left = padding_needed_w // 2
                 right = padding_needed_w - left
@@ -260,9 +248,18 @@ class SeparableConvBlock(torch.nn.Module):
     Depthwise seperable convolution block.
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, dilation=1, bias=True,
-                 norm=None, activation=None):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        bias=True,
+        norm=None,
+        activation=None,
+    ):
         """
         Args:
             in_channels (int): the number of input tensor channels.
@@ -279,22 +276,26 @@ class SeparableConvBlock(torch.nn.Module):
         super(SeparableConvBlock, self).__init__()
         self.norm = norm
         self.activation = activation
-        self.depthwise = Conv2dSamePadding(in_channels=in_channels,
-                                           out_channels=in_channels,
-                                           kernel_size=kernel_size,
-                                           stride=stride,
-                                           padding=padding,
-                                           dilation=dilation,
-                                           groups=in_channels,
-                                           bias=False)
-        self.pointwise = Conv2dSamePadding(in_channels=in_channels,
-                                           out_channels=out_channels,
-                                           kernel_size=1,
-                                           stride=1,
-                                           padding=0,
-                                           dilation=1,
-                                           groups=1,
-                                           bias=bias)
+        self.depthwise = Conv2dSamePadding(
+            in_channels=in_channels,
+            out_channels=in_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=in_channels,
+            bias=False,
+        )
+        self.pointwise = Conv2dSamePadding(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            dilation=1,
+            groups=1,
+            bias=bias,
+        )
         if bias:
             self.bias = self.pointwise.bias
 
@@ -380,15 +381,13 @@ else:
 
 
 class MLP(nn.Module):
-    """ Very simple multi-layer perceptron (also called FFN)"""
+    """Very simple multi-layer perceptron (also called FFN)"""
 
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
         super().__init__()
         self.num_layers = num_layers
         h = [hidden_dim] * (num_layers - 1)
-        self.layers = nn.ModuleList(
-            nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim])
-        )
+        self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
 
     def forward(self, x):
         for i, layer in enumerate(self.layers):
@@ -397,18 +396,12 @@ class MLP(nn.Module):
 
 
 class ConvFCHead(nn.Module):
-
     def __init__(self, input_dim, conv_dims=[], fc_dims=[], conv_norm="BN1d", fc_norm="LN"):
         super().__init__()
 
         conv_norm_relus = OrderedDict()
         for k, conv_dim in enumerate(conv_dims):
-            conv_norm_relus[f"conv{k}"] = nn.Conv1d(
-                input_dim,
-                conv_dim,
-                kernel_size=1,
-                bias=not conv_norm
-            )
+            conv_norm_relus[f"conv{k}"] = nn.Conv1d(input_dim, conv_dim, kernel_size=1, bias=not conv_norm)
             input_dim = conv_dim
             if conv_norm == "BN1d":
                 conv_norm_relus[f"conv_bn{k}"] = nn.BatchNorm1d(conv_dim)
@@ -443,20 +436,14 @@ def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corne
     A wrapper around :func:`torch.nn.functional.interpolate` to support zero-size tensor.
     """
     if input.numel() > 0:
-        return torch.nn.functional.interpolate(
-            input, size, scale_factor, mode, align_corners=align_corners
-        )
+        return torch.nn.functional.interpolate(input, size, scale_factor, mode, align_corners=align_corners)
 
     def _check_size_scale_factor(dim):
         if size is None and scale_factor is None:
             raise ValueError("either size or scale_factor should be defined")
         if size is not None and scale_factor is not None:
             raise ValueError("only one of size or scale_factor should be defined")
-        if (
-            scale_factor is not None and
-            isinstance(scale_factor, tuple) and
-            len(scale_factor) != dim
-        ):
+        if scale_factor is not None and isinstance(scale_factor, tuple) and len(scale_factor) != dim:
             raise ValueError(
                 "scale_factor shape must match input shape. "
                 "Input is {}D, scale_factor size is {}".format(dim, len(scale_factor))

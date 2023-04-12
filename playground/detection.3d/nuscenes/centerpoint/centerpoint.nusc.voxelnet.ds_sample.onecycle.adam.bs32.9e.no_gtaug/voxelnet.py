@@ -41,7 +41,6 @@ class VoxelNet(nn.Module):
         self.to(self.device)
 
     def assign_one(self, datas, info, data_id):
-
         max_objs = self._max_objs
         class_names_by_task = [t.class_names for t in self.tasks]
         num_classes_by_task = [t.num_classes for t in self.tasks]
@@ -65,9 +64,7 @@ class VoxelNet(nn.Module):
         task_masks = []
         flag = 0
         for class_name in class_names_by_task:
-            task_masks.append([
-                np.where(gt_dict["gt_classes"] == class_name.index(i) + 1 + flag) for i in class_name
-            ])
+            task_masks.append([np.where(gt_dict["gt_classes"] == class_name.index(i) + 1 + flag) for i in class_name])
             flag += len(class_name)
 
         task_boxes = []
@@ -113,10 +110,10 @@ class VoxelNet(nn.Module):
             num_objs = min(gt_dict["gt_boxes"][idx].shape[0], max_objs)
 
             for k in range(num_objs):
-                cls_id = gt_dict['gt_classes'][idx][k] - 1
+                cls_id = gt_dict["gt_classes"][idx][k] - 1
 
-                L = gt_dict['gt_boxes'][idx][k][3]
-                W = gt_dict['gt_boxes'][idx][k][4]
+                L = gt_dict["gt_boxes"][idx][k][3]
+                W = gt_dict["gt_boxes"][idx][k][4]
                 # H = gt_dict['gt_boxes'][idx][k][5]
 
                 L = L / voxel_size[0] / self.out_size_factor
@@ -127,9 +124,9 @@ class VoxelNet(nn.Module):
                     radius = max(self._min_radius, int(radius))
 
                     # be really careful for the coordinate system of your box annotation.
-                    x = gt_dict['gt_boxes'][idx][k][0]
-                    y = gt_dict['gt_boxes'][idx][k][1]
-                    z = gt_dict['gt_boxes'][idx][k][2]
+                    x = gt_dict["gt_boxes"][idx][k][0]
+                    y = gt_dict["gt_boxes"][idx][k][1]
+                    z = gt_dict["gt_boxes"][idx][k][2]
 
                     coor_x = (x - pc_range[0]) / voxel_size[0] / self.out_size_factor
                     coor_y = (y - pc_range[1]) / voxel_size[1] / self.out_size_factor
@@ -150,17 +147,20 @@ class VoxelNet(nn.Module):
                     ind[new_idx] = y * feature_map_size[0] + x
                     mask[new_idx] = 1
 
-                    vx, vy = gt_dict['gt_boxes'][idx][k][6:8]
-                    rot = gt_dict['gt_boxes'][idx][k][8]
-                    anno_box[new_idx] = np.concatenate((
-                        ct - (x, y),
-                        z,
-                        np.log(gt_dict['gt_boxes'][idx][k][3:6]),
-                        np.array(vx),
-                        np.array(vy),
-                        np.sin(rot),
-                        np.cos(rot)
-                    ), axis=None)
+                    vx, vy = gt_dict["gt_boxes"][idx][k][6:8]
+                    rot = gt_dict["gt_boxes"][idx][k][8]
+                    anno_box[new_idx] = np.concatenate(
+                        (
+                            ct - (x, y),
+                            z,
+                            np.log(gt_dict["gt_boxes"][idx][k][3:6]),
+                            np.array(vx),
+                            np.array(vy),
+                            np.sin(rot),
+                            np.cos(rot),
+                        ),
+                        axis=None,
+                    )
 
             hms.append(hm)
             anno_boxs.append(anno_box)
@@ -169,8 +169,8 @@ class VoxelNet(nn.Module):
             cats.append(cat)
 
         # used for two stage code
-        boxes = flatten(gt_dict['gt_boxes'])
-        classes = merge_multi_group_label(gt_dict['gt_classes'], num_classes_by_task)
+        boxes = flatten(gt_dict["gt_boxes"])
+        classes = merge_multi_group_label(gt_dict["gt_classes"], num_classes_by_task)
 
         gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)
 
@@ -181,19 +181,12 @@ class VoxelNet(nn.Module):
         boxes_and_cls = boxes_and_cls[:, [0, 1, 2, 3, 4, 5, 8, 6, 7, 9]]
         gt_boxes_and_cls[:num_obj] = boxes_and_cls
 
-        example.update({'gt_boxes_and_cls': gt_boxes_and_cls})
-        example.update({
-            'hm': hms,
-            'anno_box': anno_boxs,
-            'ind': inds,
-            'mask': masks,
-            'cat': cats
-        })
+        example.update({"gt_boxes_and_cls": gt_boxes_and_cls})
+        example.update({"hm": hms, "anno_box": anno_boxs, "ind": inds, "mask": masks, "cat": cats})
 
         return example
 
     def label_assign(self, datas, infos):
-
         targets_list = []
 
         for data_id, info in enumerate(infos):
@@ -245,7 +238,6 @@ class VoxelNet(nn.Module):
 
 
 def collate(batch_list, device):
-
     targets_merged = collections.defaultdict(list)
     for targets in batch_list:
         for k, v in targets.items():
@@ -259,19 +251,19 @@ def collate(batch_list, device):
         if key in ["voxels", "num_points_per_voxel", "num_voxels"]:
             ret[key] = torch.tensor(np.concatenate(elems, axis=0)).to(device)
         elif key in [
-                "gt_boxes",
-                "image_boxes",
-                "gt_names",
-                "difficulty",
-                "group_ids",
-                "gt_boxes_and_cls",
+            "gt_boxes",
+            "image_boxes",
+            "gt_names",
+            "difficulty",
+            "group_ids",
+            "gt_boxes_and_cls",
         ]:
             max_gt = -1
             for k in range(batch_size):
                 max_gt = max(max_gt, len(elems[k]))
                 batch_gt_boxes3d = np.zeros((batch_size, max_gt, *elems[0].shape[1:]), dtype=elems[0].dtype)
             for i in range(batch_size):
-                batch_gt_boxes3d[i, :len(elems[i])] = elems[i]
+                batch_gt_boxes3d[i, : len(elems[i])] = elems[i]
             if key != "gt_names":
                 batch_gt_boxes3d = torch.tensor(batch_gt_boxes3d)
             ret[key] = batch_gt_boxes3d
@@ -292,15 +284,15 @@ def collate(batch_list, device):
                 coors.append(coor_pad)
             ret[key] = torch.tensor(np.concatenate(coors, axis=0)).to(device)
         elif key in [
-                "anchors",
-                "reg_targets",
-                "reg_weights",
-                "labels",
-                "anno_box",
-                "hm",
-                "cat",
-                "mask",
-                "ind",
+            "anchors",
+            "reg_targets",
+            "reg_weights",
+            "labels",
+            "anno_box",
+            "hm",
+            "cat",
+            "mask",
+            "ind",
         ]:
             ret[key] = collections.defaultdict(list)
             res = []

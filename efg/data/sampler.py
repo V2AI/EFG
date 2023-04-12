@@ -37,25 +37,19 @@ class InfiniteSampler(Sampler):
     def __len__(self):
         return len(self.data_source)
 
-    next = __next__    # Python 2 compatibility
+    next = __next__  # Python 2 compatibility
 
 
 @SAMPLERS.register()
 class DistributedInfiniteSampler(InfiniteSampler):
-    def __init__(self,
-                 data_source,
-                 num_replicas=None,
-                 rank=None,
-                 shuffle=True):
+    def __init__(self, data_source, num_replicas=None, rank=None, shuffle=True):
         if num_replicas is None:
             if not dist.is_available():
-                raise RuntimeError(
-                    "Requires distributed package to be available")
+                raise RuntimeError("Requires distributed package to be available")
             num_replicas = dist.get_world_size()
         if rank is None:
             if not dist.is_available():
-                raise RuntimeError(
-                    "Requires distributed package to be available")
+                raise RuntimeError("Requires distributed package to be available")
             rank = dist.get_rank()
 
         self.data_source = data_source
@@ -144,15 +138,16 @@ class DistributedGroupSampler(Sampler):
         self.rank = rank
         self.epoch = 0
 
-        assert hasattr(self.dataset, 'aspect_ratios')
+        assert hasattr(self.dataset, "aspect_ratios")
         self.aspect_ratios = self.dataset.aspect_ratios
         self.group_sizes = np.bincount(self.aspect_ratios)
 
         self.num_samples = 0
         for i, j in enumerate(self.group_sizes):
-            self.num_samples += int(
-                math.ceil(self.group_sizes[i] * 1.0 / self.samples_per_gpu / self.num_replicas)
-            ) * self.samples_per_gpu
+            self.num_samples += (
+                int(math.ceil(self.group_sizes[i] * 1.0 / self.samples_per_gpu / self.num_replicas))
+                * self.samples_per_gpu
+            )
         self.total_size = self.num_samples * self.num_replicas
 
     def __iter__(self):
@@ -173,20 +168,20 @@ class DistributedGroupSampler(Sampler):
                 tmp = indice.copy()
                 for _ in range(extra // size):
                     indice.extend(tmp)
-                indice.extend(tmp[:extra % size])
+                indice.extend(tmp[: extra % size])
                 indices.extend(indice)
 
         assert len(indices) == self.total_size
 
         indices = [
-            indices[j] for i in list(
-                torch.randperm(len(indices) // self.samples_per_gpu, generator=g)
-            ) for j in range(i * self.samples_per_gpu, (i + 1) * self.samples_per_gpu)
+            indices[j]
+            for i in list(torch.randperm(len(indices) // self.samples_per_gpu, generator=g))
+            for j in range(i * self.samples_per_gpu, (i + 1) * self.samples_per_gpu)
         ]
 
         # subsample
         offset = self.num_samples * self.rank
-        indices = indices[offset:offset + self.num_samples]
+        indices = indices[offset : offset + self.num_samples]
         assert len(indices) == self.num_samples
 
         return iter(indices)

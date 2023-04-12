@@ -79,10 +79,7 @@ class Sequential(torch.nn.Module):
 
 class GroupNorm(torch.nn.GroupNorm):
     def __init__(self, num_channels, num_groups, eps=1e-5, affine=True):
-        super().__init__(num_groups=num_groups,
-                         num_channels=num_channels,
-                         eps=eps,
-                         affine=affine)
+        super().__init__(num_groups=num_groups, num_channels=num_channels, eps=eps, affine=affine)
 
 
 class Empty(torch.nn.Module):
@@ -138,13 +135,12 @@ def get_printer(msg):
     """This function returns a printer function, that prints information about a  tensor's
     gradient. Used by register_hook in the backward pass.
     """
+
     def printer(tensor):
         if tensor.nelement() == 1:
             print(f"{msg} {tensor}")
         else:
-            print(f"{msg} shape: {tensor.shape}"
-                  f" max: {tensor.max()} min: {tensor.min()}"
-                  f" mean: {tensor.mean()}")
+            print(f"{msg} shape: {tensor.shape}" f" max: {tensor.max()} min: {tensor.min()}" f" mean: {tensor.mean()}")
 
     return printer
 
@@ -170,8 +166,7 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
     # tiled_actual_num: [N, M, 1]
     max_num_shape = [1] * len(actual_num.shape)
     max_num_shape[axis + 1] = -1
-    max_num = torch.arange(max_num, dtype=torch.int,
-                           device=actual_num.device).view(max_num_shape)
+    max_num = torch.arange(max_num, dtype=torch.int, device=actual_num.device).view(max_num_shape)
     # tiled_actual_num: [[3,3,3,3,3], [4,4,4,4,4], [2,2,2,2,2]]
     # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
     paddings_indicator = actual_num.int() > max_num

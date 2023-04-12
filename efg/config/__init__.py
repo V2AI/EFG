@@ -91,7 +91,7 @@ class Configuration:
                 array_index = -1
                 if field.find("[") != -1 and field.find("]") != -1:
                     stripped_field = field[: field.find("[")]
-                    array_index = int(field[field.find("[") + 1: field.find("]")])
+                    array_index = int(field[field.find("[") + 1 : field.find("]")])
                 else:
                     stripped_field = field
                 if stripped_field not in current:

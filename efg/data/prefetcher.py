@@ -18,9 +18,7 @@ class Prefetcher:
             return
 
         with torch.cuda.stream(self.stream):
-            self.next_batch = self.dataset.prepare_batch(
-                self.next_batch, non_blocking=True
-            )
+            self.next_batch = self.dataset.prepare_batch(self.next_batch, non_blocking=True)
 
     def _record_batch(self, batch):
         samples, targets = batch

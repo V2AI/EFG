@@ -79,9 +79,7 @@ class DatasetEvaluators(DatasetEvaluator):
             result = evaluator.evaluate()
             if comm.is_main_process() and result is not None:
                 for k, v in result.items():
-                    assert (
-                        k not in results
-                    ), "Different evaluators produce results with the same key {}".format(k)
+                    assert k not in results, "Different evaluators produce results with the same key {}".format(k)
                     results[k] = v
         return results
 
@@ -138,9 +136,7 @@ def inference_on_dataset(model, data_loader, evaluator):
                 eta = datetime.timedelta(seconds=int(total_seconds_per_img * (total - idx - 1)))
                 log_every_n_seconds(
                     logging.INFO,
-                    "Inference done {}/{}. {:.4f} s / sample. ETA={}".format(
-                        idx + 1, total, seconds_per_img, str(eta)
-                    ),
+                    "Inference done {}/{}. {:.4f} s / sample. ETA={}".format(idx + 1, total, seconds_per_img, str(eta)),
                     n=5,
                 )
 
@@ -156,9 +152,7 @@ def inference_on_dataset(model, data_loader, evaluator):
     total_compute_time_str = str(datetime.timedelta(seconds=int(total_compute_time)))
     logger.info(
         "Total inference pure compute time: {} ({:.6f} s / sample per device, "
-        "on {} devices)".format(
-            total_compute_time_str, total_compute_time / (total - num_warmup), num_devices
-        )
+        "on {} devices)".format(total_compute_time_str, total_compute_time / (total - num_warmup), num_devices)
     )
 
     evaluator.evaluate()

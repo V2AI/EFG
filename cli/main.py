@@ -54,12 +54,11 @@ def link_log(output_dir, link_name="log"):
 
 
 def worker(args):
-
     configuration = Configuration(args)
     config = configuration.get_config()
 
     # setup global logger
-    output_dir = os.path.join(config.trainer.output_dir, "EFG", os.getcwd().split('playground')[1][1:])
+    output_dir = os.path.join(config.trainer.output_dir, "EFG", os.getcwd().split("playground")[1][1:])
     if comm.is_main_process() and output_dir:
         PathManager.mkdirs(output_dir)
         link_log(output_dir)
@@ -83,6 +82,7 @@ def worker(args):
     logger.info(f"Running with full config:\n{OmegaConf.to_yaml(config)}")
 
     from net import build_model  # net.py in experiment directories
+
     trainer = build_trainer(configuration, build_model)
 
     if config.task == "train":
@@ -104,7 +104,6 @@ def worker(args):
 
 
 def main():
-
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["EFG_PATH"] = dirname(dirname(efg.__file__))
     sys.path.insert(0, "./")
@@ -127,7 +126,7 @@ def main():
         machine_rank=args.machine_rank,
         dist_url=args.dist_url,
         port=args.master_port,
-        args=(args, ),
+        args=(args,),
     )
 
 

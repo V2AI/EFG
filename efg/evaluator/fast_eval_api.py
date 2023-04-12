@@ -47,9 +47,7 @@ class COCOeval_opt(COCOeval):
             computeIoU = self.computeIoU
         elif p.iouType == "keypoints":
             computeIoU = self.computeOks
-        self.ious = {
-            (imgId, catId): computeIoU(imgId, catId) for imgId in p.imgIds for catId in catIds
-        }
+        self.ious = {(imgId, catId): computeIoU(imgId, catId) for imgId in p.imgIds for catId in catIds}
 
         maxDet = p.maxDets[-1]
 
@@ -71,12 +69,10 @@ class COCOeval_opt(COCOeval):
 
         # Convert GT annotations, detections, and IOUs to a format that's fast to access in C++
         ground_truth_instances = [
-            [convert_instances_to_cpp(self._gts[imgId, catId]) for catId in p.catIds]
-            for imgId in p.imgIds
+            [convert_instances_to_cpp(self._gts[imgId, catId]) for catId in p.catIds] for imgId in p.imgIds
         ]
         detected_instances = [
-            [convert_instances_to_cpp(self._dts[imgId, catId], is_det=True) for catId in p.catIds]
-            for imgId in p.imgIds
+            [convert_instances_to_cpp(self._dts[imgId, catId], is_det=True) for catId in p.catIds] for imgId in p.imgIds
         ]
         ious = [[self.ious[imgId, catId] for catId in catIds] for imgId in p.imgIds]
 
@@ -109,9 +105,7 @@ class COCOeval_opt(COCOeval):
         self.eval = _C.COCOevalAccumulate(self._paramsEval, self._evalImgs_cpp)
 
         # recall is num_iou_thresholds X num_categories X num_area_ranges X num_max_detections
-        self.eval["recall"] = np.array(self.eval["recall"]).reshape(
-            self.eval["counts"][:1] + self.eval["counts"][2:]
-        )
+        self.eval["recall"] = np.array(self.eval["recall"]).reshape(self.eval["counts"][:1] + self.eval["counts"][2:])
 
         # precision and scores are num_iou_thresholds X num_recall_thresholds X num_categories X
         # num_area_ranges X num_max_detections

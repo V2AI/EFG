@@ -1,7 +1,6 @@
 class BoxerBoxCoder:
-
-    def encode(self, ):
+    def encode(self):
         pass
 
-    def decode(self, ):
+    def decode(self):
         pass

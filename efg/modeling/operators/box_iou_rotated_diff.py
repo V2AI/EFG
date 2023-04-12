@@ -8,7 +8,7 @@ from .box_intersection_2d import oriented_box_intersection_2d
 
 
 def rotated_box_to_poly(rotated_boxes: torch.Tensor):
-    """ Transform rotated boxes to polygons
+    """Transform rotated boxes to polygons
     Args:
         rotated_boxes (Tensor): (x, y, w, h, a) with shape (n, 5)
     Return:
@@ -63,4 +63,9 @@ def box_iou_rotated_differentiable(boxes1: torch.Tensor, boxes2: torch.Tensor, i
     if iou_only:
         return iou
     else:
-        return iou, union, polys1, polys2,
+        return (
+            iou,
+            union,
+            polys1,
+            polys2,
+        )

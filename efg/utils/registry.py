@@ -29,9 +29,7 @@ class Registry(object):
         self._obj_map: Dict[str, object] = {}
 
     def _do_register(self, name: str, obj: object) -> None:
-        assert (
-            name not in self._obj_map
-        ), "An object named '{}' was already registered in '{}' registry!".format(
+        assert name not in self._obj_map, "An object named '{}' was already registered in '{}' registry!".format(
             name, self._name
         )
         self._obj_map[name] = obj
@@ -60,9 +58,7 @@ class Registry(object):
     def get(self, name: str) -> object:
         ret = self._obj_map.get(name)
         if ret is None:
-            raise KeyError(
-                "No object named '{}' found in '{}' registry!".format(name, self._name)
-            )
+            raise KeyError("No object named '{}' found in '{}' registry!".format(name, self._name))
         return ret
 
     def __contains__(self, name: str) -> bool:

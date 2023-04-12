@@ -27,7 +27,7 @@ def boxes_bev_iou_cpu(boxes_a, boxes_b):
     """
     boxes_a, is_numpy = check_numpy_to_torch(boxes_a)
     boxes_b, is_numpy = check_numpy_to_torch(boxes_b)
-    assert not (boxes_a.is_cuda or boxes_b.is_cuda), 'Only support CPU tensors'
+    assert not (boxes_a.is_cuda or boxes_b.is_cuda), "Only support CPU tensors"
     assert boxes_a.shape[1] == 7 and boxes_b.shape[1] == 7
     ans_iou = boxes_a.new_zeros(torch.Size((boxes_a.shape[0], boxes_b.shape[0])))
     _C.boxes_iou_bev_cpu(boxes_a.contiguous(), boxes_b.contiguous(), ans_iou)

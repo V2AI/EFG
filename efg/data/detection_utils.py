@@ -162,9 +162,7 @@ def check_image_size(dataset_dict, image):
         if not image_wh == expected_wh:
             raise SizeMismatchError(
                 "Mismatched image shape{}, got {}, expect {}.".format(
-                    " for image " + dataset_dict["file_name"]
-                    if "file_name" in dataset_dict
-                    else "",
+                    " for image " + dataset_dict["file_name"] if "file_name" in dataset_dict else "",
                     image_wh,
                     expected_wh,
                 )
@@ -178,8 +176,7 @@ def check_image_size(dataset_dict, image):
         dataset_dict["height"] = image.shape[0]
 
 
-def transform_proposals(dataset_dict, image_shape, transforms,
-                        min_box_side_len, proposal_topk):
+def transform_proposals(dataset_dict, image_shape, transforms, min_box_side_len, proposal_topk):
     """
     Apply transformations to the proposals in dataset_dict, if any.
 
@@ -203,10 +200,10 @@ def transform_proposals(dataset_dict, image_shape, transforms,
                 dataset_dict.pop("proposal_boxes"),
                 dataset_dict.pop("proposal_bbox_mode"),
                 BoxMode.XYXY_ABS,
-            ))
+            )
+        )
         boxes = Boxes(boxes)
-        objectness_logits = torch.as_tensor(
-            dataset_dict.pop("proposal_objectness_logits").astype("float32"))
+        objectness_logits = torch.as_tensor(dataset_dict.pop("proposal_objectness_logits").astype("float32"))
 
         boxes.clip(image_shape)
         keep = boxes.nonempty(threshold=min_box_side_len)
@@ -235,10 +232,7 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
             "gt_masks", "gt_keypoints", if they can be obtained from `annos`.
             This is the format that builtin models expect.
     """
-    boxes = [
-        BoxMode.convert(obj["bbox"], obj["bbox_mode"], BoxMode.XYXY_ABS)
-        for obj in annos
-    ]
+    boxes = [BoxMode.convert(obj["bbox"], obj["bbox_mode"], BoxMode.XYXY_ABS) for obj in annos]
     target = Instances(image_size)
     boxes = target.gt_boxes = Boxes(boxes)
     boxes.clip(image_size)
@@ -262,8 +256,7 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
                     # COCO RLE
                     masks.append(mask_util.decode(segm))
                 elif isinstance(segm, np.ndarray):
-                    assert segm.ndim == 2, "Expect segmentation of 2 dimensions, got {}.".format(
-                        segm.ndim)
+                    assert segm.ndim == 2, "Expect segmentation of 2 dimensions, got {}.".format(segm.ndim)
                     # mask array
                     masks.append(segm)
                 else:
@@ -271,12 +264,10 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
                         "Cannot convert segmentation of type '{}' to BitMasks!"
                         "Supported types are: polygons as list[list[float] or ndarray],"
                         " COCO-style RLE as a dict, or a full-image segmentation mask "
-                        "as a 2D ndarray.".format(type(segm)))
+                        "as a 2D ndarray.".format(type(segm))
+                    )
             # torch.from_numpy does not support array with negative stride.
-            masks = BitMasks(
-                torch.stack([
-                    torch.from_numpy(np.ascontiguousarray(x)) for x in masks
-                ]))
+            masks = BitMasks(torch.stack([torch.from_numpy(np.ascontiguousarray(x)) for x in masks]))
         target.gt_masks = masks
 
     if len(annos) and "keypoints" in annos[0]:
@@ -389,20 +380,18 @@ def check_metadata_consistency(key, dataset_names, meta):
     entries_per_dataset = [meta.get(key) for d in dataset_names]
     for idx, entry in enumerate(entries_per_dataset):
         if entry != entries_per_dataset[0]:
-            logger.error("Metadata '{}' for dataset '{}' is '{}'".format(
-                key, dataset_names[idx], str(entry)))
-            logger.error("Metadata '{}' for dataset '{}' is '{}'".format(
-                key, dataset_names[0], str(entries_per_dataset[0])))
-            raise ValueError(
-                "Datasets have different metadata '{}'!".format(key))
+            logger.error("Metadata '{}' for dataset '{}' is '{}'".format(key, dataset_names[idx], str(entry)))
+            logger.error(
+                "Metadata '{}' for dataset '{}' is '{}'".format(key, dataset_names[0], str(entries_per_dataset[0]))
+            )
+            raise ValueError("Datasets have different metadata '{}'!".format(key))
 
 
 def check_sample_valid(args):
     if args["sample_style"] == "range":
-        assert (
-            len(args["short_edge_length"]) == 2
-        ), f"more than 2 ({len(args['short_edge_length'])}) " \
-            "short_edge_length(s) are provided for ranges"
+        assert len(args["short_edge_length"]) == 2, (
+            f"more than 2 ({len(args['short_edge_length'])}) " "short_edge_length(s) are provided for ranges"
+        )
 
 
 def imdecode(data, *, require_chl3=True, require_alpha=False):
@@ -415,13 +404,13 @@ def imdecode(data, *, require_chl3=True, require_alpha=False):
     """
     img = cv2.imdecode(np.fromstring(data, np.uint8), cv2.IMREAD_UNCHANGED)
 
-    if img is None and len(data) >= 3 and data[:3] == b'GIF':
+    if img is None and len(data) >= 3 and data[:3] == b"GIF":
         # cv2 doesn't support GIF, try PIL
         img = _gif_decode(data)
 
-    assert img is not None, 'failed to decode'
+    assert img is not None, "failed to decode"
     if img.ndim == 2 and require_chl3:
-        img = img.reshape(img.shape + (1, ))
+        img = img.reshape(img.shape + (1,))
     if img.shape[2] == 1 and require_chl3:
         img = np.tile(img, (1, 1, 3))
     if img.ndim == 3 and img.shape[2] == 3 and require_alpha:
@@ -437,7 +426,7 @@ def _gif_decode(data):
         from PIL import Image
 
         im = Image.open(io.BytesIO(data))
-        im = im.convert('RGB')
+        im = im.convert("RGB")
         return cv2.cvtColor(np.array(im), cv2.COLOR_RGB2BGR)
     except Exception:
         return

@@ -34,7 +34,6 @@ class Transformer(nn.Module):
         self.decoder = TransformerDecoder(d_model, decoder_layer, num_decoder_layers)
 
     def _create_ref_windows(self, tensor_list):
-
         device = tensor_list[0].device
 
         ref_windows = []
@@ -50,9 +49,9 @@ class Transformer(nn.Module):
             ref_xy = torch.stack((ref_x, ref_y), -1)
             ref_wh = torch.ones_like(ref_xy) * 0.025  # 0.01 - 0.05 w.r.t. Deform-DETR
             placeholder = torch.zeros_like(ref_xy)[..., :1]
-            ref_box = torch.cat(
-                (ref_xy, placeholder + 0.5, ref_wh, placeholder + 0.5, placeholder), -1
-            ).expand(B, -1, -1)
+            ref_box = torch.cat((ref_xy, placeholder + 0.5, ref_wh, placeholder + 0.5, placeholder), -1).expand(
+                B, -1, -1
+            )
             ref_windows.append(ref_box)
         ref_windows = torch.cat(ref_windows, dim=1)
 
@@ -68,10 +67,13 @@ class Transformer(nn.Module):
         indexes = indexes.unsqueeze(-1)
 
         out_ref_windows = torch.gather(out_ref_windows, 1, indexes.expand(-1, -1, out_ref_windows.shape[-1]))
-        out_ref_windows = torch.cat((
-            out_ref_windows.detach(),
-            topk_probs.detach().expand(-1, -1, 3),
-        ), dim=-1)
+        out_ref_windows = torch.cat(
+            (
+                out_ref_windows.detach(),
+                topk_probs.detach().expand(-1, -1, 3),
+            ),
+            dim=-1,
+        )
 
         out_pos = None
         out_embed = None
@@ -84,10 +86,9 @@ class Transformer(nn.Module):
         Momentum update of the key encoder
         """
         for param_q, param_k in zip(self.decoder.parameters(), self.decoder_gt.parameters()):
-            param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
+            param_k.data = param_k.data * self.m + param_q.data * (1.0 - self.m)
 
     def forward(self, src, pos, noised_gt_box=None, noised_gt_onehot=None, attn_mask=None, targets=None):
-
         assert pos is not None, "position encoding is required!"
         src_anchors = self._create_ref_windows(src)
         src, _, src_shape = flatten_with_shape(src, None)
@@ -103,19 +104,31 @@ class Transformer(nn.Module):
         query_embed, query_pos, topk_proposals, topk_indexes = self._get_enc_proposals(memory, src_anchors)
 
         if noised_gt_box is not None:
-            noised_gt_proposals = torch.cat((
-                noised_gt_box,
-                noised_gt_onehot,
-            ), dim=-1)
-            topk_proposals = torch.cat((
-                noised_gt_proposals,
-                topk_proposals,
-            ), dim=1)
+            noised_gt_proposals = torch.cat(
+                (
+                    noised_gt_box,
+                    noised_gt_onehot,
+                ),
+                dim=-1,
+            )
+            topk_proposals = torch.cat(
+                (
+                    noised_gt_proposals,
+                    topk_proposals,
+                ),
+                dim=1,
+            )
         init_reference_out = topk_proposals[..., :7]
 
         # hs, inter_references = self.decoder_gt(
         hs, inter_references = self.decoder(
-            query_embed, query_pos, memory, src_shape, src_start_index, topk_proposals, attn_mask,
+            query_embed,
+            query_pos,
+            memory,
+            src_shape,
+            src_start_index,
+            topk_proposals,
+            attn_mask,
         )
 
         # optional gt forward
@@ -125,9 +138,10 @@ class Transformer(nn.Module):
             max_gt_num = max(per_gt_num)
             batched_gt_boxes_with_score = memory.new_zeros(batch_size, max_gt_num, 10)
             for bi in range(batch_size):
-                batched_gt_boxes_with_score[bi, :per_gt_num[bi], :7] = targets[bi]["gt_boxes"]
-                batched_gt_boxes_with_score[bi, :per_gt_num[bi], 7:] = \
-                    F.one_hot(targets[bi]["labels"], num_classes=self.num_classes)
+                batched_gt_boxes_with_score[bi, : per_gt_num[bi], :7] = targets[bi]["gt_boxes"]
+                batched_gt_boxes_with_score[bi, : per_gt_num[bi], 7:] = F.one_hot(
+                    targets[bi]["labels"], num_classes=self.num_classes
+                )
 
             with torch.no_grad():
                 self._momentum_update_gt_decoder()
@@ -135,7 +149,7 @@ class Transformer(nn.Module):
                     dn_group_num = noised_gt_proposals.shape[1] // (max_gt_num * 2)
                     pos_idxs = list(range(0, dn_group_num * 2, 2))
                     pos_noised_gt_proposals = torch.cat(
-                        [noised_gt_proposals[:, pi * max_gt_num: (pi + 1) * max_gt_num] for pi in pos_idxs],
+                        [noised_gt_proposals[:, pi * max_gt_num : (pi + 1) * max_gt_num] for pi in pos_idxs],
                         dim=1,
                     )
                     gt_proposals = torch.cat((batched_gt_boxes_with_score, pos_noised_gt_proposals), dim=1)
@@ -145,30 +159,45 @@ class Transformer(nn.Module):
                     ).bool()
                     for di in range(dn_group_num + 1):
                         gt_attn_mask[
-                            di * max_gt_num:(di + 1) * max_gt_num,
-                            di * max_gt_num:(di + 1) * max_gt_num,
+                            di * max_gt_num : (di + 1) * max_gt_num,
+                            di * max_gt_num : (di + 1) * max_gt_num,
                         ] = False
                 else:
                     gt_proposals = batched_gt_boxes_with_score
                     gt_attn_mask = None
 
                 hs_gt, inter_references_gt = self.decoder_gt(
-                    None, None, memory, src_shape, src_start_index, gt_proposals, gt_attn_mask,
+                    None,
+                    None,
+                    memory,
+                    src_shape,
+                    src_start_index,
+                    gt_proposals,
+                    gt_attn_mask,
                 )
 
-            init_reference_out = torch.cat((
-                init_reference_out,
-                gt_proposals[..., :7],
-            ), dim=1)
+            init_reference_out = torch.cat(
+                (
+                    init_reference_out,
+                    gt_proposals[..., :7],
+                ),
+                dim=1,
+            )
 
-            hs = torch.cat((
-                hs,
-                hs_gt,
-            ), dim=2)
-            inter_references = torch.cat((
-                inter_references,
-                inter_references_gt,
-            ), dim=2)
+            hs = torch.cat(
+                (
+                    hs,
+                    hs_gt,
+                ),
+                dim=2,
+            )
+            inter_references = torch.cat(
+                (
+                    inter_references,
+                    inter_references_gt,
+                ),
+                dim=2,
+            )
 
         inter_references_out = inter_references
         return hs, init_reference_out, inter_references_out, memory, src_anchors, topk_indexes
@@ -194,7 +223,6 @@ class TransformerEncoderLayer(nn.Module):
         return tensor if pos is None else tensor + pos
 
     def forward(self, src, pos, src_shape, src_start_idx, ref_windows):
-
         src2 = self.self_attn(
             self.with_pos_embed(src, pos),
             src,
@@ -252,9 +280,7 @@ class TransformerDecoderLayer(nn.Module):
     def with_pos_embed(tensor, pos):
         return tensor if pos is None else tensor + pos
 
-    def forward(
-        self, idx, query, query_pos, memory, memory_shape, memory_start_idx, ref_windows, attn_mask=None
-    ):
+    def forward(self, idx, query, query_pos, memory, memory_shape, memory_start_idx, ref_windows, attn_mask=None):
         if idx == 0:
             query = self.pos_embed_layer(ref_windows)
             q = k = query
@@ -297,9 +323,7 @@ class TransformerDecoder(nn.Module):
 
         self.layers = get_clones(decoder_layer, num_layers)
 
-    def forward(
-        self, query, query_pos, memory, memory_shape, memory_start_idx, ref_windows, attn_mask=None
-    ):
+    def forward(self, query, query_pos, memory, memory_shape, memory_start_idx, ref_windows, attn_mask=None):
         output = query
         intermediate = []
         intermediate_ref_windows = []
@@ -307,10 +331,13 @@ class TransformerDecoder(nn.Module):
             output = layer(idx, output, query_pos, memory, memory_shape, memory_start_idx, ref_windows, attn_mask)
             new_ref_logits, new_ref_windows = self.detection_head(output, ref_windows[..., :7], idx)
             new_ref_probs = new_ref_logits.sigmoid()
-            ref_windows = torch.cat((
-                new_ref_windows.detach(),
-                new_ref_probs.detach(),
-            ), dim=-1)
+            ref_windows = torch.cat(
+                (
+                    new_ref_windows.detach(),
+                    new_ref_probs.detach(),
+                ),
+                dim=-1,
+            )
             intermediate.append(output)
             intermediate_ref_windows.append(new_ref_windows)
         return torch.stack(intermediate), torch.stack(intermediate_ref_windows)

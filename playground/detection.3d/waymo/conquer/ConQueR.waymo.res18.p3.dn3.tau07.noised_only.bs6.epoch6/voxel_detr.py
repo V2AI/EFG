@@ -7,7 +7,7 @@ from efg.data.datasets.waymo import collate
 from efg.modeling.backbones.fpn import build_resnet_fpn_backbone
 from efg.modeling.readers.voxel_reader import VoxelMeanFeatureExtractor
 
-from cdn import prepare_for_cdn, dn_post_process
+from cdn import dn_post_process, prepare_for_cdn
 from heads import Det3DHead
 from modules.backbone3d import Backbone3d
 from modules.box_coder import VoxelBoxCoder3D
@@ -40,13 +40,15 @@ class VoxelDETR(nn.Module):
         in_channels = self.backbone.num_channels
 
         # build input projection from backbone to transformer
-        self.input_proj = nn.ModuleList([
-            nn.Sequential(
-                nn.Conv2d(in_channels[i], self.hidden_dim, kernel_size=1),
-                nn.GroupNorm(32, self.hidden_dim),
-            )
-            for i in range(len(self.backbone.out_features))
-        ])
+        self.input_proj = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(in_channels[i], self.hidden_dim, kernel_size=1),
+                    nn.GroupNorm(32, self.hidden_dim),
+                )
+                for i in range(len(self.backbone.out_features))
+            ]
+        )
         for module in self.input_proj.modules():
             if isinstance(module, nn.Conv2d):
                 nn.init.xavier_uniform_(module.weight, gain=1)
@@ -114,7 +116,6 @@ class VoxelDETR(nn.Module):
         self.to(self.device)
 
     def forward(self, batched_inputs):
-
         batch_size = len(batched_inputs)
 
         # samples: ['voxels', 'points', 'coordinates', 'num_points_per_voxel', 'num_voxels', 'shape', 'range', 'size']
@@ -122,7 +123,7 @@ class VoxelDETR(nn.Module):
 
         if self.training:
             targets = [bi[1]["annotations"] for bi in batched_inputs]
-            for key in ['gt_boxes', 'difficulty', 'num_points_in_gt', 'labels']:
+            for key in ["gt_boxes", "difficulty", "num_points_in_gt", "labels"]:
                 for i in range(batch_size):
                     targets[i][key] = torch.tensor(targets[i][key], device=self.device)
             targets = [self.box_coder.encode(tgt) for tgt in targets]
@@ -160,7 +161,12 @@ class VoxelDETR(nn.Module):
             input_query_bbox = input_query_label = attn_mask = dn_meta = None
 
         outputs = self.transformer(
-            features, pos_encodings, input_query_bbox, input_query_label, attn_mask, targets=targets,
+            features,
+            pos_encodings,
+            input_query_bbox,
+            input_query_label,
+            attn_mask,
+            targets=targets,
         )
         hidden_state, init_reference, inter_references, src_embed, src_ref_windows, src_indexes = outputs
 
@@ -204,10 +210,11 @@ class VoxelDETR(nn.Module):
 
             # compute decoder losses
             outputs = {
-                "pred_logits": outputs_class[-1][:, :self.num_queries],
-                "pred_boxes": outputs_coord[-1][:, :self.num_queries],
+                "pred_logits": outputs_class[-1][:, : self.num_queries],
+                "pred_boxes": outputs_coord[-1][:, : self.num_queries],
                 "aux_outputs": self._set_aux_loss(
-                    outputs_class[:-1, :, :self.num_queries], outputs_coord[:-1, :, :self.num_queries]),
+                    outputs_class[:-1, :, : self.num_queries], outputs_coord[:-1, :, : self.num_queries]
+                ),
             }
             dec_losses = self.transformer.decoder.detection_head.compute_losses(outputs, targets, dn_meta)
             losses.update(dec_losses)
@@ -220,15 +227,18 @@ class VoxelDETR(nn.Module):
                 for li in range(self.config.model.transformer.dec_layers):
                     contrastive_loss = 0.0
                     projs = torch.cat((outputs_class[li], outputs_coord[li]), dim=-1)
-                    gt_projs = self.projector(projs[:, self.num_queries:].detach())
-                    pred_projs = self.predictor(self.projector(projs[:, :self.num_queries]))
+                    gt_projs = self.projector(projs[:, self.num_queries :].detach())
+                    pred_projs = self.predictor(self.projector(projs[:, : self.num_queries]))
                     # num_gts x num_locs
                     pos_idxs = list(range(1, dn_meta["num_dn_group"] + 1))
                     for bi, idx in enumerate(outputs["matched_indices"]):
-                        sim_matrix = self.similarity_f(
-                            gt_projs[bi].unsqueeze(1),
-                            pred_projs[bi].unsqueeze(0),
-                        ) / self.tau
+                        sim_matrix = (
+                            self.similarity_f(
+                                gt_projs[bi].unsqueeze(1),
+                                pred_projs[bi].unsqueeze(0),
+                            )
+                            / self.tau
+                        )
                         matched_pairs = torch.stack(idx, dim=-1)
                         neg_mask = projs.new_ones(self.num_queries).bool()
                         neg_mask[matched_pairs[:, 0]] = False
@@ -236,17 +246,17 @@ class VoxelDETR(nn.Module):
                             pos_mask = torch.tensor([int(pair[1] + max_gt * pi) for pi in pos_idxs], device=self.device)
                             pos_pair = sim_matrix[pos_mask, pair[0]].view(-1, 1)
                             neg_pairs = sim_matrix[:, neg_mask][pos_mask]
-                            loss_gti = torch.log(
-                                torch.exp(pos_pair) + torch.exp(neg_pairs).sum(dim=-1, keepdim=True)
-                            ) - pos_pair
+                            loss_gti = (
+                                torch.log(torch.exp(pos_pair) + torch.exp(neg_pairs).sum(dim=-1, keepdim=True))
+                                - pos_pair
+                            )
                             contrastive_loss += loss_gti.mean()
                     losses[f"loss_contrastive_dec_{li}"] = self.contras_loss_coeff * contrastive_loss / num_gts
 
             return losses
         else:
-
-            out_logits = outputs_class[-1][:, :self.num_queries]
-            out_bbox = outputs_coord[-1][:, :self.num_queries]
+            out_logits = outputs_class[-1][:, : self.num_queries]
+            out_bbox = outputs_coord[-1][:, : self.num_queries]
 
             out_prob = out_logits.sigmoid()
             out_prob = out_prob.view(out_logits.shape[0], -1)
@@ -255,9 +265,7 @@ class VoxelDETR(nn.Module):
             def _process_output(indices, bboxes):
                 topk_boxes = indices.div(out_logits.shape[2], rounding_mode="floor")
                 labels = indices % out_logits.shape[2]
-                boxes = torch.gather(
-                    bboxes, 1, topk_boxes.unsqueeze(-1).repeat(1, 1, out_bbox.shape[-1])
-                )
+                boxes = torch.gather(bboxes, 1, topk_boxes.unsqueeze(-1).repeat(1, 1, out_bbox.shape[-1]))
                 return labels + 1, boxes, topk_boxes
 
             topk_indices = torch.nonzero(out_prob >= 0.1, as_tuple=True)[1]
@@ -280,6 +288,4 @@ class VoxelDETR(nn.Module):
         # this is a workaround to make torchscript happy, as torchscript
         # doesn't support dictionary with non-homogeneous values, such
         # as a dict having both a Tensor and a list.
-        return [
-            {'pred_logits': a, 'pred_boxes': b} for a, b in zip(outputs_class, outputs_coord)
-        ]
+        return [{"pred_logits": a, "pred_boxes": b} for a, b in zip(outputs_class, outputs_coord)]

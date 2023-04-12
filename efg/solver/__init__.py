@@ -10,6 +10,7 @@ def build_optimizer(config, model):
 
     return optimizer
 
+
 def build_scheduler(config, optimizer):
     scheduler_type = config.solver.lr_scheduler.pop("type")
     scheduler = LR_SCHEDULERS.get(scheduler_type).build(config, optimizer)

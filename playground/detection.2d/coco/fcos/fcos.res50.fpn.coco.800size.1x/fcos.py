@@ -39,7 +39,6 @@ def build_backbone(config, input_shape=None):
 
 
 def build_shift_generator(config, input_shape):
-
     return ShiftGenerator(config.model.shift_generator, input_shape)
 
 
@@ -55,9 +54,7 @@ def permute_to_N_HWA_K(tensor, K):
     return tensor
 
 
-def permute_all_cls_and_box_to_N_HWA_K_and_concat(
-    box_cls, box_delta, box_center, num_classes=80
-):
+def permute_all_cls_and_box_to_N_HWA_K_and_concat(box_cls, box_delta, box_center, num_classes=80):
     """
     Rearrange the tensor layout from the network output, i.e.:
     list[Tensor]: #lvl tensors of shape (N, A x K, Hi, Wi)
@@ -245,11 +242,7 @@ class FCOS(nn.Module):
             reduction="sum",
         ) / max(1, num_foreground)
 
-        return {
-            "loss_cls": loss_cls,
-            "loss_box_reg": loss_box_reg,
-            "loss_centerness": loss_centerness
-        }
+        return {"loss_cls": loss_cls, "loss_box_reg": loss_box_reg, "loss_centerness": loss_centerness}
 
     @torch.no_grad()
     def get_ground_truth(self, shifts, targets):
@@ -286,10 +279,13 @@ class FCOS(nn.Module):
         gt_centerness = []
 
         for shifts_per_image, targets_per_image in zip(shifts, targets):
-            object_sizes_of_interest = torch.cat([
-                shifts_i.new_tensor([float(s) for s in size]).unsqueeze(0).expand(shifts_i.size(0), -1)
-                for shifts_i, size in zip(shifts_per_image, self.object_sizes_of_interest)
-            ], dim=0)
+            object_sizes_of_interest = torch.cat(
+                [
+                    shifts_i.new_tensor([float(s) for s in size]).unsqueeze(0).expand(shifts_i.size(0), -1)
+                    for shifts_i, size in zip(shifts_per_image, self.object_sizes_of_interest)
+                ],
+                dim=0,
+            )
 
             shifts_over_all_feature_maps = torch.cat(shifts_per_image, dim=0)
 
@@ -302,10 +298,13 @@ class FCOS(nn.Module):
                 is_in_boxes = []
                 for stride, shifts_i in zip(self.fpn_strides, shifts_per_image):
                     radius = stride * self.center_sampling_radius
-                    center_boxes = torch.cat((
-                        torch.max(centers - radius, gt_boxes.tensor[:, :2]),
-                        torch.min(centers + radius, gt_boxes.tensor[:, 2:]),
-                    ), dim=-1)
+                    center_boxes = torch.cat(
+                        (
+                            torch.max(centers - radius, gt_boxes.tensor[:, :2]),
+                            torch.min(centers + radius, gt_boxes.tensor[:, 2:]),
+                        ),
+                        dim=-1,
+                    )
                     center_deltas = self.shift2box_transform.get_deltas(shifts_i, center_boxes.unsqueeze(1))
                     is_in_boxes.append(center_deltas.min(dim=-1).values > 0)
                 is_in_boxes = torch.cat(is_in_boxes, dim=1)
@@ -315,9 +314,9 @@ class FCOS(nn.Module):
 
             max_deltas = deltas.max(dim=-1).values
             # limit the regression range for each location
-            is_cared_in_the_level = \
-                (max_deltas >= object_sizes_of_interest[None, :, 0]) & \
-                (max_deltas <= object_sizes_of_interest[None, :, 1])
+            is_cared_in_the_level = (max_deltas >= object_sizes_of_interest[None, :, 0]) & (
+                max_deltas <= object_sizes_of_interest[None, :, 1]
+            )
 
             gt_positions_area = gt_boxes.area().unsqueeze(1).repeat(1, shifts_over_all_feature_maps.size(0))
             gt_positions_area[~is_in_boxes] = math.inf
@@ -345,8 +344,8 @@ class FCOS(nn.Module):
             left_right = gt_shifts_reg_deltas_i[:, [0, 2]]
             top_bottom = gt_shifts_reg_deltas_i[:, [1, 3]]
             gt_centerness_i = torch.sqrt(
-                (left_right.min(dim=-1).values / left_right.max(dim=-1).values).clamp_(min=0) *
-                (top_bottom.min(dim=-1).values / top_bottom.max(dim=-1).values).clamp_(min=0)
+                (left_right.min(dim=-1).values / left_right.max(dim=-1).values).clamp_(min=0)
+                * (top_bottom.min(dim=-1).values / top_bottom.max(dim=-1).values).clamp_(min=0)
             )
 
             gt_classes.append(gt_classes_i)
@@ -381,8 +380,11 @@ class FCOS(nn.Module):
             box_reg_per_image = [box_reg_per_level[img_idx] for box_reg_per_level in box_delta]
             box_ctr_per_image = [box_ctr_per_level[img_idx] for box_ctr_per_level in box_center]
             results_per_image = self.inference_single_image(
-                box_cls_per_image, box_reg_per_image, box_ctr_per_image,
-                shifts_per_image, tuple(image_size),
+                box_cls_per_image,
+                box_reg_per_image,
+                box_ctr_per_image,
+                shifts_per_image,
+                tuple(image_size),
             )
             results.append(results_per_image)
         return results
@@ -446,7 +448,7 @@ class FCOS(nn.Module):
         keep = generalized_batched_nms(
             boxes_all, scores_all, class_idxs_all, self.nms_threshold, nms_type=self.nms_type
         )
-        keep = keep[:self.max_detections_per_image]
+        keep = keep[: self.max_detections_per_image]
 
         result = Instances(image_size)
         result.pred_boxes = Boxes(boxes_all[keep])
@@ -478,9 +480,7 @@ class FCOS(nn.Module):
         shifts = self.shift_generator(features)
 
         results = self.inference(box_cls, box_delta, box_center, shifts, images)
-        for results_per_image, input_per_image, image_size in zip(
-                results, batched_inputs, images.image_sizes
-        ):
+        for results_per_image, input_per_image, image_size in zip(results, batched_inputs, images.image_sizes):
             height = input_per_image.get("height", image_size[0])
             width = input_per_image.get("width", image_size[1])
             processed_results = detector_postprocess(results_per_image, height, width)

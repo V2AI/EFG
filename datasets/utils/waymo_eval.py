@@ -35,7 +35,6 @@ def limit_period(val, offset=0.5, period=np.pi):
 
 
 class WaymoEvaluator(tf.test.TestCase):
-
     WAYMO_CLASSES = ("UNKNOWN", "VEHICLE", "PEDESTRIAN", "SIGN", "CYCLIST")
 
     def generate_waymo_type_results(self, infos, token_list, class_names, is_gt=False):
@@ -47,29 +46,20 @@ class WaymoEvaluator(tf.test.TestCase):
                 info = {"scores": info["pred_scores"], "labels": info["pred_labels"], "boxes3d": info["pred_boxes3d"]}
 
             info["boxes"] = info["boxes3d"][:, [0, 1, 2, 3, 4, 5, -1]]
-            info["names"] = np.array(
-                [self.WAYMO_CLASSES[i] for i in info["labels"].tolist()]
-            )
+            info["names"] = np.array([self.WAYMO_CLASSES[i] for i in info["labels"].tolist()])
 
             if is_gt:
                 info["difficulty"] = info["difficulty"]
                 info["num_points_in_gt"] = info["num_points_in_gt"]
 
                 box_mask = np.array(
-                    [
-                        self.WAYMO_CLASSES[i] in class_names
-                        for i in info["labels"].tolist()
-                    ],
+                    [self.WAYMO_CLASSES[i] in class_names for i in info["labels"].tolist()],
                     dtype=np.bool_,
                 )
                 if "num_points_in_gt" in info:
                     zero_difficulty_mask = info["difficulty"] == 0
-                    info["difficulty"][
-                        (info["num_points_in_gt"] > 5) & zero_difficulty_mask
-                    ] = 1
-                    info["difficulty"][
-                        (info["num_points_in_gt"] <= 5) & zero_difficulty_mask
-                    ] = 2
+                    info["difficulty"][(info["num_points_in_gt"] > 5) & zero_difficulty_mask] = 1
+                    info["difficulty"][(info["num_points_in_gt"] <= 5) & zero_difficulty_mask] = 2
                     nonzero_mask = info["num_points_in_gt"] > 0
                     box_mask = box_mask & nonzero_mask
                 else:
@@ -95,9 +85,7 @@ class WaymoEvaluator(tf.test.TestCase):
                 boxes3d.append(np.array(info["boxes"]))
                 box_name = info["names"]
 
-            obj_type += [
-                self.WAYMO_CLASSES.index(name) for i, name in enumerate(box_name)
-            ]
+            obj_type += [self.WAYMO_CLASSES.index(name) for i, name in enumerate(box_name)]
 
             seq_id = int(token.split("_")[1])
             f_id = int(token.split("_")[3][:-4])
@@ -262,10 +250,7 @@ class WaymoEvaluator(tf.test.TestCase):
         )
 
         print("Number: (pd, %d) VS. (gt, %d)" % (len(pd_boxes3d), len(gt_boxes3d)))
-        print(
-            "Level 1: %d, Level2: %d)"
-            % ((gt_difficulty == 1).sum(), (gt_difficulty == 2).sum())
-        )
+        print("Level 1: %d, Level2: %d)" % ((gt_difficulty == 1).sum(), (gt_difficulty == 2).sum()))
 
         if pd_score.max() > 1:
             # assert pd_score.max() <= 1.0, 'Waymo evaluation only supports normalized scores'
@@ -317,7 +302,7 @@ def main():
         result_dict = {"TYPE": cls_name}
         for key, value in waymo_AP.items():
             if cls_name in key:
-                result_dict[key[len("OBJECT_TYPE_TYPE_"):]] = value
+                result_dict[key[len("OBJECT_TYPE_TYPE_") :]] = value
         result_dicts.append(result_dict)
 
     with open("./README.md", "w") as f:

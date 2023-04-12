@@ -16,7 +16,6 @@ class ClassificationLoss(nn.Module):
         self.src_logits = None
 
     def forward(self, outputs, targets, indices, num_boxes):
-
         assert "pred_logits" in outputs
         src_logits = outputs["pred_logits"]
         target_classes_onehot = torch.zeros_like(src_logits)
@@ -37,13 +36,16 @@ class ClassificationLoss(nn.Module):
             # N, L, C
             target_classes_onehot[idx[0], idx[1], target_classes_o] = 1
 
-        loss_ce = sigmoid_focal_loss(
-            src_logits,
-            target_classes_onehot,
-            alpha=self.focal_alpha,
-            gamma=2.0,
-            reduction="sum",
-        ) / num_boxes
+        loss_ce = (
+            sigmoid_focal_loss(
+                src_logits,
+                target_classes_onehot,
+                alpha=self.focal_alpha,
+                gamma=2.0,
+                reduction="sum",
+            )
+            / num_boxes
+        )
 
         losses = {
             "loss_ce": loss_ce,
@@ -53,7 +55,6 @@ class ClassificationLoss(nn.Module):
 
 
 class RegressionLoss(nn.Module):
-
     def forward(self, outputs, targets, indices, num_boxes):
         assert "pred_boxes" in outputs
         idx = _get_src_permutation_idx(indices)
@@ -116,7 +117,6 @@ class Det3DLoss(nn.Module):
                 return self.det3d_losses[k].src_logits, self.det3d_losses[k].target_classes
 
     def forward(self, outputs, targets):
-
         # Compute the average number of target boxes accross all nodes, for normalization purposes
         num_boxes = sum([len(t["labels"]) for t in targets])
         num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device)

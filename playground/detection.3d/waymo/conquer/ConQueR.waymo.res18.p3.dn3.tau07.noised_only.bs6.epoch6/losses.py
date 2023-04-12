@@ -30,7 +30,6 @@ class ClassificationLoss(nn.Module):
         self.src_logits = None
 
     def forward(self, outputs, targets, indices, num_boxes):
-
         # put indices into outputs
         outputs["matched_indices"] = indices
 
@@ -54,13 +53,16 @@ class ClassificationLoss(nn.Module):
             # N, L, C
             target_classes_onehot[idx[0], idx[1], target_classes_o] = 1
 
-        loss_ce = sigmoid_focal_loss(
-            src_logits,
-            target_classes_onehot,
-            alpha=self.focal_alpha,
-            gamma=2.0,
-            reduction="sum",
-        ) / num_boxes
+        loss_ce = (
+            sigmoid_focal_loss(
+                src_logits,
+                target_classes_onehot,
+                alpha=self.focal_alpha,
+                gamma=2.0,
+                reduction="sum",
+            )
+            / num_boxes
+        )
 
         losses = {
             "loss_ce": loss_ce,
@@ -70,7 +72,6 @@ class ClassificationLoss(nn.Module):
 
 
 class RegressionLoss(nn.Module):
-
     def forward(self, outputs, targets, indices, num_boxes):
         assert "pred_boxes" in outputs
         idx = _get_src_permutation_idx(indices)
@@ -133,15 +134,14 @@ class Det3DLoss(nn.Module):
                 return self.det3d_losses[k].src_logits, self.det3d_losses[k].target_classes
 
     def prep_for_dn(self, dn_meta):
-        output_known_lbs_bboxes = dn_meta['output_known_lbs_bboxes']
-        num_dn_groups, pad_size = dn_meta['num_dn_group'], dn_meta['pad_size']
+        output_known_lbs_bboxes = dn_meta["output_known_lbs_bboxes"]
+        num_dn_groups, pad_size = dn_meta["num_dn_group"], dn_meta["pad_size"]
         assert pad_size % num_dn_groups == 0
         single_pad = pad_size // num_dn_groups
 
         return output_known_lbs_bboxes, single_pad, num_dn_groups
 
     def forward(self, outputs, targets, dn_meta=None):
-
         # Compute the average number of target boxes accross all nodes, for normalization purposes
         num_boxes = sum([len(t["labels"]) for t in targets])
         num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device)
@@ -157,8 +157,8 @@ class Det3DLoss(nn.Module):
             dn_pos_idx = []
             dn_neg_idx = []
             for i in range(len(targets)):
-                if len(targets[i]['labels']) > 0:
-                    t = torch.arange(0, len(targets[i]['labels']) - 1).long().cuda()
+                if len(targets[i]["labels"]) > 0:
+                    t = torch.arange(0, len(targets[i]["labels"]) - 1).long().cuda()
                     t = t.unsqueeze(0).repeat(scalar, 1)
                     tgt_idx = t.flatten()
                     output_idx = (torch.tensor(range(scalar)) * single_pad).long().cuda().unsqueeze(1) + t
@@ -171,13 +171,15 @@ class Det3DLoss(nn.Module):
 
             l_dict = {}
             for loss in self.losses:
-                l_dict.update(self.det3d_losses[loss](
-                    output_known_lbs_bboxes,
-                    targets,
-                    dn_pos_idx,
-                    num_boxes * scalar,
-                ))
-            l_dict = {k + '_dn': v for k, v in l_dict.items()}
+                l_dict.update(
+                    self.det3d_losses[loss](
+                        output_known_lbs_bboxes,
+                        targets,
+                        dn_pos_idx,
+                        num_boxes * scalar,
+                    )
+                )
+            l_dict = {k + "_dn": v for k, v in l_dict.items()}
             losses.update(l_dict)
 
         # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
@@ -190,16 +192,18 @@ class Det3DLoss(nn.Module):
                     losses.update(l_dict)
 
                 if dn_meta is not None:
-                    aux_outputs_known = output_known_lbs_bboxes['aux_outputs'][i]
+                    aux_outputs_known = output_known_lbs_bboxes["aux_outputs"][i]
                     l_dict = {}
                     for loss in self.losses:
-                        l_dict.update(self.det3d_losses[loss](
-                            aux_outputs_known,
-                            targets,
-                            dn_pos_idx,
-                            num_boxes * scalar,
-                        ))
-                    l_dict = {k + f'_dn_{i}': v for k, v in l_dict.items()}
+                        l_dict.update(
+                            self.det3d_losses[loss](
+                                aux_outputs_known,
+                                targets,
+                                dn_pos_idx,
+                                num_boxes * scalar,
+                            )
+                        )
+                    l_dict = {k + f"_dn_{i}": v for k, v in l_dict.items()}
                     losses.update(l_dict)
 
         # Retrieve the matching between the outputs of the last layer and the targets

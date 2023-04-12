@@ -107,7 +107,7 @@ class nuScenesDetEvaluator(DatasetEvaluator):
 
     def reset(self):
         self._predictions = []
-        self._dump_infos = []    # per task
+        self._dump_infos = []  # per task
 
     def process(self, inputs, outputs):
         for input, output in zip(inputs, outputs):
@@ -134,7 +134,7 @@ class nuScenesDetEvaluator(DatasetEvaluator):
             boxes = _lidar_nusc_box_to_global(nusc, boxes, det["token"])
             for i, box in enumerate(boxes):
                 name = self._metadata["mapped_class_names"][box.label]
-                if np.sqrt(box.velocity[0]**2 + box.velocity[1]**2) > 0.2:
+                if np.sqrt(box.velocity[0] ** 2 + box.velocity[1] ** 2) > 0.2:
                     if name in ["car", "construction_vehicle", "bus", "truck", "trailer"]:
                         attr = "vehicle.moving"
                     elif name in ["bicycle", "motorcycle"]:
@@ -150,24 +150,16 @@ class nuScenesDetEvaluator(DatasetEvaluator):
                         attr = None
 
                 nusc_anno = {
-                    "sample_token":
-                    det["token"],
-                    "translation":
-                    box.center.tolist(),
-                    "size":
-                    box.wlh.tolist(),
-                    "rotation":
-                    box.orientation.elements.tolist(),
-                    "velocity":
-                    box.velocity[:2].tolist(),
-                    "detection_name":
-                    name,
-                    "detection_score":
-                    box.score,
-                    "attribute_name":
-                    attr if attr is not None else max(
-                        self._metadata["cls_attr_dist"][name].items(), key=operator.itemgetter(1)
-                    )[0],
+                    "sample_token": det["token"],
+                    "translation": box.center.tolist(),
+                    "size": box.wlh.tolist(),
+                    "rotation": box.orientation.elements.tolist(),
+                    "velocity": box.velocity[:2].tolist(),
+                    "detection_name": name,
+                    "detection_score": box.score,
+                    "attribute_name": attr
+                    if attr is not None
+                    else max(self._metadata["cls_attr_dist"][name].items(), key=operator.itemgetter(1))[0],
                 }
                 annos.append(nusc_anno)
             self.nusc_annos["results"].update({det["token"]: annos})

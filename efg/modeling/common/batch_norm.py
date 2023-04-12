@@ -92,15 +92,12 @@ class FrozenBatchNorm2d(nn.Module):
                     state_dict[prefix + "running_var"] = torch.ones_like(self.running_var)
 
             if version < 3:
-                logger.info(
-                    "FrozenBatchNorm {} is upgraded to version 3.".format(prefix.rstrip("."))
-                )
+                logger.info("FrozenBatchNorm {} is upgraded to version 3.".format(prefix.rstrip(".")))
                 # In version < 3, running_var are used without +eps.
                 state_dict[prefix + "running_var"] -= self.eps
 
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs
+            state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
         )
 
     def __repr__(self):

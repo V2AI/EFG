@@ -53,18 +53,13 @@ def list_to_padded(
     element_ndim = max(y.ndim for y in x)
 
     # replace empty 1D tensors with empty tensors with a correct number of dimensions
-    x = [
-        (y.new_zeros([0] * element_ndim) if (y.ndim == 1 and y.nelement() == 0) else y)
-        for y in x
-    ]
+    x = [(y.new_zeros([0] * element_ndim) if (y.ndim == 1 and y.nelement() == 0) else y) for y in x]
 
     if any(y.ndim != x[0].ndim for y in x):
         raise ValueError("All items have to have the same number of dimensions!")
 
     if pad_size is None:
-        pad_dims = [
-            max(y.shape[dim] for y in x if len(y) > 0) for dim in range(x[0].ndim)
-        ]
+        pad_dims = [max(y.shape[dim] for y in x if len(y) > 0) for dim in range(x[0].ndim)]
     else:
         if any(len(pad_size) != y.ndim for y in x):
             raise ValueError("Pad size must contain target size for all dimensions.")
@@ -144,9 +139,7 @@ def list_to_packed(x: List[torch.Tensor]):
         num = len(y)
         num_items[i] = num
         item_packed_first_idx[i] = cur
-        item_packed_to_list_idx.append(
-            torch.full((num,), i, dtype=torch.int64, device=y.device)
-        )
+        item_packed_to_list_idx.append(torch.full((num,), i, dtype=torch.int64, device=y.device))
         cur += num
 
     x_packed = torch.cat(x, dim=0)

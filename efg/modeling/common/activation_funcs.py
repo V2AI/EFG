@@ -10,6 +10,7 @@ class SwishImplementation(torch.autograd.Function):
     This implementation explicitly processes the gradient, it keeps a copy of the input tensor,
     and uses it to calculate the gradient during the back-propagation phase.
     """
+
     @staticmethod
     def forward(ctx, i):
         result = i * torch.sigmoid(i)

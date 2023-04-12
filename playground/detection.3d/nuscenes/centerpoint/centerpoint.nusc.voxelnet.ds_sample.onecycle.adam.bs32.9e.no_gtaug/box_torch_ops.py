@@ -1,6 +1,6 @@
-from efg import _C
-
 import torch
+
+from efg import _C
 
 
 def rotate_nms_pcdet(boxes, scores, thresh, pre_maxsize=None, post_max_size=None):
