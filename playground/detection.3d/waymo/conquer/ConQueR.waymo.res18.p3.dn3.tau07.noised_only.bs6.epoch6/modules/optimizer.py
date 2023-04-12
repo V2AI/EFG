@@ -1,7 +1,5 @@
 import collections.abc
 
-import omegaconf
-
 import torch
 
 from efg.solver import OPTIMIZERS

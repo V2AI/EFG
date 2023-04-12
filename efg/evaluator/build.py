@@ -6,15 +6,13 @@ from .evaluator import DatasetEvaluators
 from .registry import EVALUATORS
 
 
-def build_evaluators(configuration, dataset=None):
+def build_evaluators(config, dataset=None):
     """
     Create evaluator(s) for a given dataset.
     This uses the special metadata "evaluator_type" associated with each builtin dataset.
     For your own dataset, you can simply create an evaluator manually in your
     script and do not have to worry about the hacky if-else logic here.
     """
-    config = configuration.get_config()
-
     output_folder = os.path.join(config.trainer.output_dir, "inference")
     if not os.path.exists(output_folder):
         if comm.is_main_process():

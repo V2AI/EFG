@@ -100,8 +100,8 @@ class Checkpointer:
             with PathManager.open(filename, "rb") as f:
                 data = pickle.load(f, encoding="latin1")
             if "model" in data and "__author__" in data:
-                # file is in d2 model zoo format
-                self.logger.info("Reading a file from '{}'".format(data["__author__"]))
+                # file is in cvpods model zoo format
+                logger.info("Reading a file from '{}'".format(data["__author__"]))
                 return data
             else:
                 # assume file is from Caffe2 / Detectron1 model zoo

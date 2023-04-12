@@ -1,8 +1,10 @@
 import argparse
+import json
 import os
 import sys
 from os.path import dirname
 
+from easydict import EasyDict as edict
 from omegaconf import OmegaConf
 
 import torch
@@ -55,7 +57,7 @@ def link_log(output_dir, link_name="log"):
 
 def worker(args):
     configuration = Configuration(args)
-    config = configuration.get_config()
+    config = edict(OmegaConf.to_container(configuration.get_config(), resolve=True))
 
     # setup global logger
     output_dir = os.path.join(config.trainer.output_dir, "EFG", os.getcwd().split("playground")[1][1:])
@@ -82,10 +84,9 @@ def worker(args):
     seed = seed_all_rng(None if config.misc.seed < 0 else config.misc.seed)
     config.misc.seed = seed
 
-    logger.info(f"Running with full config:\n{OmegaConf.to_yaml(config, resolve=True)}")
+    logger.info(f"Running with full config:\n{json.dumps(config, indent=2)}")
 
     from net import build_model  # net.py in experiment directories
-
     trainer = build_trainer(config, build_model)
 
     if config.task == "train":
@@ -96,11 +97,11 @@ def worker(args):
         config.task = "val"
         eval_dataset = build_dataset(config)
         eval_dataloader = build_dataloader(config, eval_dataset, msg=manual_set_generator)
-        evaluators = build_evaluators(configuration, eval_dataset)
+        evaluators = build_evaluators(config, eval_dataset)
         trainer.evaluate(evaluators, eval_dataloader, test=False)
     elif config.task == "val" or config.task == "test":
         trainer.resume_or_load()
-        evaluators = build_evaluators(configuration, trainer.dataset)
+        evaluators = build_evaluators(config, trainer.dataset)
         trainer.evaluate(evaluators, test=config.task == "test")
     else:
         raise NotImplementedError

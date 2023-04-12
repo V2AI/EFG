@@ -1,0 +1,206 @@
+includes:
+    - ${oc.env:EFG_PATH}/efg/config/gallary/datasets/coco.yaml
+    - ${oc.env:EFG_PATH}/efg/config/gallary/backbones.yaml
+
+
+task: train
+
+
+dataset:
+
+    type: COCODatasetV2 
+    name: coco_panoptic_2017 
+    source: ${coco_panoptic.source.coco_panoptic_2017}
+
+    with_gt: True
+    format: RGB
+    mask_format: polygon  # bitmask 
+    filter_empty_annotations: True
+    proposal_files_train: null
+    ignore_label: 255
+    label_divisor: 1000
+    num_classes: 80
+
+    # mask2former input
+    INPUT: 
+        DATASET_MAPPER_NAME: "coco_panoptic_lsj"
+        COLOR_AUG_SSD: False
+        SINGLE_CATEGORY_MAX_AREA: 1.0
+        SIZE_DIVISIBILITY: -1
+
+    processors:
+        train:
+            - RandomFlip:
+                prob: 0.5
+                horizontal: True 
+                vertical: False
+            - ResizeScale:
+                min_scale: 0.1 
+                max_scale: 2.0 
+                target_height: 1024 
+                target_width: 1024
+            - FixedSizeCrop: 
+                crop_size: [1024, 1024]
+        val:
+            - ResizeShortestEdge:
+                short_edge_length: 800
+                max_size: 1333
+                sample_style: choice
+
+    test:
+        keypoint_oks_sigmas: 17
+        detections_per_image: 100
+
+dataloader:
+    num_workers: 2 
+    batch_size: 2  # per_gpu 
+
+    aspect_ratio_grouping: True
+    sampler: DistributedGroupSampler
+
+
+model:
+    device: cuda
+
+    weights: detectron2://ImageNetPretrained/torchvision/R-50.pkl
+    pixel_mean: [123.675, 116.280, 103.530]
+    pixel_std: [58.395, 57.120, 57.375]
+
+    load_proposals: False
+    mask_on: False
+    keypoint_on: False
+    
+    backbone: 
+        freeze_at: 0
+        # build_resnet_backbone
+    
+    resnets:
+        depth: 50 
+        out_features: [res2, res3, res4, res5]
+        norm: FrozenBN
+        zero_init_residual: False
+        stride_in_1x1: False  # False for torchvision, True for MSRA 
+
+    SWIN:
+        PRETRAIN_IMG_SIZE: 224
+        PATCH_SIZE: 4
+        EMBED_DIM: 96
+        DEPTHS: [2, 2, 6, 2]
+        NUM_HEADS: [3, 6, 12, 24]
+        WINDOW_SIZE: 7
+        MLP_RATIO: 4.0
+        QKV_BIAS: True
+        QK_SCALE: None
+        DROP_RATE: 0.0
+        ATTN_DROP_RATE: 0.0
+        DROP_PATH_RATE: 0.3
+        APE: False
+        PATCH_NORM: True
+        OUT_FEATURES: ["res2", "res3", "res4", "res5"]
+        USE_CHECKPOINT: False
+
+MODEL:
+    SEM_SEG_HEAD:
+        NAME: "MaskFormerHead"
+        IGNORE_VALUE: 255
+        NUM_CLASSES: 133
+        LOSS_WEIGHT: 1.0
+        CONVS_DIM: 256
+        MASK_DIM: 256
+        NORM: "GN"
+        # pixel decoder
+        PIXEL_DECODER_NAME: "MSDeformAttnPixelDecoder"
+        IN_FEATURES: ["res2", "res3", "res4", "res5"]
+        DEFORMABLE_TRANSFORMER_ENCODER_IN_FEATURES: ["res3", "res4", "res5"]
+        DEFORMABLE_TRANSFORMER_ENCODER_N_POINTS: 4
+        DEFORMABLE_TRANSFORMER_ENCODER_N_HEADS: 8
+        COMMON_STRIDE: 4
+        TRANSFORMER_ENC_LAYERS: 6
+    MASK_FORMER:
+        TRANSFORMER_DECODER_NAME: "MultiScaleMaskedTransformerDecoder"
+        DEEP_SUPERVISION: True
+        NO_OBJECT_WEIGHT: 0.1
+        CLASS_WEIGHT: 2.0
+        MASK_WEIGHT: 5.0
+        DICE_WEIGHT: 5.0
+
+        HIDDEN_DIM: 256
+        NUM_OBJECT_QUERIES: 100
+        NHEADS: 8
+        DROPOUT: 0.0
+        DIM_FEEDFORWARD: 2048
+        ENC_LAYERS: 0
+        PRE_NORM: False
+
+        TRANSFORMER_IN_FEATURE: "multi_scale_pixel_decoder"
+        ENFORCE_INPUT_PROJ: False
+
+        SIZE_DIVISIBILITY: 32
+        DEC_LAYERS: 10  # 9 decoder layers, add one for the loss on learnable query
+
+        TRAIN_NUM_POINTS: 12544  # 112 * 112
+        OVERSAMPLE_RATIO: 3.0
+        IMPORTANCE_SAMPLE_RATIO: 0.75
+
+        TEST:
+            SEMANTIC_ON: True
+            INSTANCE_ON: True
+            PANOPTIC_ON: True
+            OVERLAP_THRESHOLD: 0.8
+            OBJECT_MASK_THRESHOLD: 0.8
+            SEM_SEG_POSTPROCESSING_BEFORE_INFERENCE: False
+
+
+SOLVER:
+  BASE_LR: 0.0001
+  WEIGHT_DECAY: 0.05
+  WEIGHT_DECAY_NORM: 0.0
+  WEIGHT_DECAY_EMBED: 0.0
+  OPTIMIZER: ADAMW
+  BACKBONE_MULTIPLIER: 0.1
+  CLIP_GRADIENTS:
+    ENABLED: True
+    CLIP_TYPE: full_model
+    CLIP_VALUE: 0.01
+    NORM_TYPE: 2.0
+
+solver:
+    lr_scheduler:
+        type: WarmupMultiStep
+        max_epochs: 50
+        steps: [45, 48]
+        # max_iters: 368750
+        # steps: [327778, 355092]
+        warmup_factor: 1.0 
+        warmup_iters: 0
+        warmup_method: linear  # "linear", "constant", "brunin"
+        gamma: 0.1  # Decrease learning rate by GAMMA.
+
+    optimizer:
+        type: FullClipAdamW
+    #     lr: 0.0001
+    #     lr_backbone: 0.00001
+    #     weight_decay: 0.05
+    #     eps: 1.0e-9
+    #     betas: [0.9, 0.999]
+    #
+    # grad_clipper:
+    #     enabled: False
+    #     clip_type: norm
+    #     params:
+    #         norm_type: 2.0
+    #         max_norm: 0.01
+
+
+trainer:
+    checkpoint_epoch: 5
+    log_interval: 20
+
+    evaluators:
+        - COCOPanopticEvaluator  # (dataset_name, output_folder)
+        # - COCOEvaluator  # (dataset_name, output_dir=output_folder)
+        # - SemSegEvaluator  # (dataset_name, distributed=True, output_dir=output_folder)
+
+
+ddp:
+    find_unused_parameters: False

@@ -6,8 +6,6 @@ import weakref
 from typing import Dict
 
 import numpy as np
-from easydict import EasyDict as edict
-from omegaconf import OmegaConf
 
 import torch
 from torch.nn.parallel import DistributedDataParallel
@@ -135,8 +133,7 @@ class TrainerBase:
 class DefaultTrainer(TrainerBase):
     def __init__(self, config):
         super(DefaultTrainer, self).__init__()
-        self.omega_config = config
-        self.config = edict(OmegaConf.to_container(config, resolve=True))
+        self.config = config
         self.is_train = self.config.task == "train"
         self.setup()
         logger.info("Finish trainer setup")
