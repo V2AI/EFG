@@ -1,16 +1,39 @@
-resnets:
-    num_classes: 1000
-    depth: 50
-    out_features: [linear, ]
-    num_groups: 1
-    # Options: FrozenBN, GN, "SyncBN", "BN"
-    norm: BN
-    activation:
-        type: ReLU
-        inplace: True
-    zero_init_residual: True
-    width_per_group: 64
-    stride_in_1x1: False
-    res5_dilation: 1
-    res2_out_channels: 256
-    stem_out_channels: 64
+model: 
+    resnets: 
+        num_classes: null 
+        depth: 50
+        # res4 for C4 backbone, res2..5 for FPN backbone
+        out_features: [res4, ]
+        # Number of groups to use; 1 ==> ResNet; > 1 ==> ResNeXt
+        num_groups: 1
+        norm: FrozenBN 
+        activation: 
+            type: ReLU
+            inplace: True 
+        zero_init_residual: True
+        # Baseline width of each group. Scaling this parameters will scale the width of all bottleneck layers.
+        width_per_group: 64 
+        # Place the stride 2 conv on the 1x1 filter
+        # Use True only for the original MSRA ResNet; use False for C2 and Torch models
+        stride_in_1x1: True 
+        # Apply dilation in stage "res5"
+        res5_dilation: 1 
+        # Output width of res2. Scaling this parameters will scale the width of all 1x1 convs in ResNet.
+        # For R18 and R34, this needs to be set to 64
+        res2_out_channels: 256 
+        stem_out_channels: 64
+        # Apply Deformable Convolution in stages. Specify if apply deform_conv on Res2, Res3, Res4, Res5
+        deform_on_per_stage: [False, False, False, False]
+        # Use True to use modulated deform_conv (DeformableV2, https://arxiv.org/abs/1811.11168); Use False for DeformableV1.
+        deform_modulated: False 
+        deform_num_groups: 1
+
+        deep_stem: False
+
+
+    fpn: 
+        in_features: []
+        out_channels: 256
+        norm: ""
+        fuse_type: sum
+        block_in_features: p5

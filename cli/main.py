@@ -66,6 +66,9 @@ def worker(args):
 
     logger = setup_logger(output_dir, distributed_rank=comm.get_rank())
 
+    logger.info(f"Command Line Args:\n{args}")
+    logger.info(f"Environment info:\n{collect_env_info()}")
+
     # if we manually set the random seed
     if config.misc.seed >= 0:
         manual_set_generator = True
@@ -79,11 +82,11 @@ def worker(args):
     seed = seed_all_rng(None if config.misc.seed < 0 else config.misc.seed)
     config.misc.seed = seed
 
-    logger.info(f"Running with full config:\n{OmegaConf.to_yaml(config)}")
+    logger.info(f"Running with full config:\n{OmegaConf.to_yaml(config, resolve=True)}")
 
     from net import build_model  # net.py in experiment directories
 
-    trainer = build_trainer(configuration, build_model)
+    trainer = build_trainer(config, build_model)
 
     if config.task == "train":
         if args.resume:
@@ -110,9 +113,6 @@ def main():
 
     parser = get_parser()
     args = parser.parse_args()
-
-    print("Command Line Args:\n", args)
-    print(f"Environment info:\n{collect_env_info()}")
 
     if args.launcher == "pytorch":
         launcher = launch

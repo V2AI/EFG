@@ -2,7 +2,6 @@ import copy
 import logging
 
 import numpy as np
-from omegaconf import OmegaConf
 
 import torch
 from torch import nn
@@ -64,7 +63,7 @@ class CenterHead(nn.Module):
         self.weight = config.model.head.misc.weight  # weight between hm loss and loc loss
         self.dataset = config.model.head.misc.dataset
 
-        self.common_heads = OmegaConf.to_container(config.model.head.misc.common_heads)
+        self.common_heads = config.model.head.misc.common_heads
 
         self.in_channels = config.model.head.in_channels
         self.num_classes = num_classes

@@ -15,21 +15,18 @@ from efg.data.structures.masks import BitMasks, PolygonMasks, polygons_to_bitmas
 from efg.data.structures.rotated_boxes import RotatedBoxes
 from efg.utils.file_io import PathManager
 
-# from . import transforms as T
-
-
-class SizeMismatchError(ValueError):
-    """
-    When loaded image has difference width/height compared with annotation.
-    """
-
-
 # https://en.wikipedia.org/wiki/YUV#SDTV_with_BT.601
 _M_RGB2YUV = [[0.299, 0.587, 0.114], [-0.14713, -0.28886, 0.436], [0.615, -0.51499, -0.10001]]
 _M_YUV2RGB = [[1.0, 0.0, 1.13983], [1.0, -0.39465, -0.58060], [1.0, 2.03211, 0.0]]
 
 # https://www.exiv2.org/tags.html
 _EXIF_ORIENT = 274  # exif 'Orientation' tag
+
+
+class SizeMismatchError(ValueError):
+    """
+    When loaded image has difference width/height compared with annotation.
+    """
 
 
 def convert_PIL_to_numpy(image, format):
@@ -174,6 +171,57 @@ def check_image_size(dataset_dict, image):
         dataset_dict["width"] = image.shape[1]
     if "height" not in dataset_dict:
         dataset_dict["height"] = image.shape[0]
+
+
+def transform_instance_annotations(annotation, transforms, image_size):
+    """
+    Apply transforms to box and segmentation annotations of a single instance.
+    It will use `transforms.apply_box` for the box, and
+    `transforms.apply_coords` for segmentation polygons.
+    If you need anything more specially designed for each data structure,
+    you'll need to implement your own version of this function or the transforms.
+    Args:
+        annotation (dict): dict of instance annotations for a single instance.
+            It will be modified in-place.
+        transforms (TransformList or list[Transform]):
+        image_size (tuple): the height, width of the transformed image
+    Returns:
+        dict:
+            the same input dict with fields "bbox", "segmentation"
+            transformed according to `transforms`.
+            The "bbox_mode" field will be set to XYXY_ABS.
+    """
+    # if isinstance(transforms, (tuple, list)):
+    #     transforms = T.TransformList(transforms)
+
+    # bbox is 1d (per-instance bounding box)
+    bbox = BoxMode.convert(annotation["bbox"], annotation["bbox_mode"], BoxMode.XYXY_ABS)
+    # clip transformed bbox to image size
+    bbox = transforms.apply_box(np.array([bbox]))[0].clip(min=0)
+    annotation["bbox"] = np.minimum(bbox, list(image_size + image_size)[::-1])
+    annotation["bbox_mode"] = BoxMode.XYXY_ABS
+
+    if "segmentation" in annotation:
+        # each instance contains 1 or more polygons
+        segm = annotation["segmentation"]
+        if isinstance(segm, list):
+            # polygons
+            polygons = [np.asarray(p).reshape(-1, 2) for p in segm]
+            annotation["segmentation"] = [p.reshape(-1) for p in transforms.apply_polygons(polygons)]
+        elif isinstance(segm, dict):
+            # RLE
+            mask = mask_util.decode(segm)
+            mask = transforms.apply_segmentation(mask)
+            assert tuple(mask.shape[:2]) == image_size
+            annotation["segmentation"] = mask
+        else:
+            raise ValueError(
+                "Cannot transform segmentation of type '{}'!"
+                "Supported types are: polygons as list[list[float] or ndarray],"
+                " COCO-style RLE as a dict.".format(type(segm))
+            )
+
+    return annotation
 
 
 def transform_proposals(dataset_dict, image_shape, transforms, min_box_side_len, proposal_topk):
@@ -360,6 +408,36 @@ def create_keypoint_hflip_indices(dataset_names, meta):
     flipped_names = [i if i not in flip_map else flip_map[i] for i in names]
     flip_indices = [names.index(i) for i in flipped_names]
     return np.asarray(flip_indices)
+
+
+# def gen_crop_transform_with_instance(crop_size, image_size, instance):
+#     """
+#     Generate a CropTransform so that the cropping region contains
+#     the center of the given instance.
+#
+#     Args:
+#         crop_size (tuple): h, w in pixels
+#         image_size (tuple): h, w
+#         instance (dict): an annotation dict of one instance, in cvpods's
+#             dataset format.
+#     """
+#     crop_size = np.asarray(crop_size, dtype=np.int32)
+#     bbox = BoxMode.convert(instance["bbox"], instance["bbox_mode"],
+#                            BoxMode.XYXY_ABS)
+#     center_yx = (bbox[1] + bbox[3]) * 0.5, (bbox[0] + bbox[2]) * 0.5
+#
+#     assert (image_size[0] >= center_yx[0] and image_size[1] >= center_yx[1]
+#             ), "The annotation bounding box is outside of the image!"
+#     assert (image_size[0] >= crop_size[0] and image_size[1] >= crop_size[1]
+#             ), "Crop size is larger than image size!"
+#
+#     min_yx = np.maximum(np.ceil(center_yx).astype(np.int32) - crop_size, 0)
+#     max_yx = np.maximum(np.asarray(image_size, dtype=np.int32) - crop_size, 0)
+#     max_yx = np.minimum(max_yx, np.floor(center_yx).astype(np.int32))
+#
+#     y0 = np.random.randint(min_yx[0], max_yx[0] + 1)
+#     x0 = np.random.randint(min_yx[1], max_yx[1] + 1)
+#     return T.CropTransform(x0, y0, crop_size[1], crop_size[0])
 
 
 def check_metadata_consistency(key, dataset_names, meta):

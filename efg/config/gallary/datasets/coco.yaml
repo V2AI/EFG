@@ -1,9 +1,23 @@
-detection:
-    version: coco2017
+coco_detection:
+    dataset: COCODataset
     source:
-        local:
-            coco:
-                root: ${oc.env:EFG_PATH}/datasets/coco 
-                train: [/train2017, /annotations/instances_train2017.json]
-                val: [/val2017, /annotations/instances_val2017.json]
-                test: [/test2017, /annotations/image_info_test2017.json]
+        coco_2017:
+            root: ${oc.env:EFG_PATH}/datasets/coco 
+            train: [/train2017, /annotations/instances_train2017.json]
+            val: [/val2017, /annotations/instances_val2017.json]
+            test: [/test2017, /annotations/image_info_test2017.json]
+
+
+coco_panoptic:
+    dataset: COCODataset
+    source:
+        coco_panoptic_2017:
+            root: ${oc.env:EFG_PATH}/datasets/coco
+            train:
+                - /train2017  # image_root
+                - /panoptic_train2017  # panoptic_root
+                - /annotations/panoptic_train2017.json  # panoptic_json
+            val:
+                - /val2017  
+                - /panoptic_val2017 
+                - /annotations/panoptic_val2017.json 

@@ -147,8 +147,9 @@ solver:
         weight_decay: 0.01
         eps: 1.0e-9
         betas: [0.9, 0.99]
+
     grad_clipper:
-        enabled: True
+        enabled: False 
         clip_type: norm
         params:
             max_norm: 10.0

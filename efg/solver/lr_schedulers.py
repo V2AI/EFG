@@ -196,8 +196,10 @@ class WarmupCosineAnnealing:
     def build(config, optimizer):
         sconfig = config.solver.lr_scheduler
         max_epochs = sconfig.pop("max_epochs")
+        epoch_iters = config.solver.lr_scheduler.pop("epoch_iters")
         lr_scheduler = WarmupCosineAnnealingLR(optimizer, **sconfig)
         sconfig.max_epochs = max_epochs
+        config.solver.lr_scheduler.epoch_iters = epoch_iters
         return lr_scheduler
 
 
@@ -209,10 +211,12 @@ class OneCycle:
         total_steps = config.solver.lr_scheduler.max_iters
         max_epochs = config.solver.lr_scheduler.pop("max_epochs")
         max_iters = config.solver.lr_scheduler.pop("max_iters")
+        epoch_iters = config.solver.lr_scheduler.pop("epoch_iters")
         lr_scheduler = OneCycleLR(optimizer, max_lr, total_steps=total_steps, **config.solver.lr_scheduler)
 
         config.solver.lr_scheduler.max_epochs = max_epochs
         config.solver.lr_scheduler.max_iters = max_iters
+        config.solver.lr_scheduler.epoch_iters = epoch_iters
 
         return lr_scheduler
 
@@ -221,9 +225,14 @@ class OneCycle:
 class WarmupMultiStep:
     @staticmethod
     def build(config, optimizer):
+        if "epoch_iters" in config.solver.lr_scheduler:
+            epoch_iters = config.solver.lr_scheduler.epoch_iters
+            steps = [epoch_iters * s for s in config.solver.lr_scheduler.steps]
+        else:
+            steps = config.solver.lr_scheduler.steps
         scheduler = WarmupMultiStepLR(
             optimizer,
-            config.solver.lr_scheduler.steps,
+            steps,
             config.solver.lr_scheduler.gamma,
             warmup_factor=config.solver.lr_scheduler.warmup_factor,
             warmup_iters=config.solver.lr_scheduler.warmup_iters,

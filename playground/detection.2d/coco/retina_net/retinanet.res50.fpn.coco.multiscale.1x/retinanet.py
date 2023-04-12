@@ -2,8 +2,6 @@ import logging
 import math
 from typing import List
 
-from omegaconf import OmegaConf
-
 import torch
 from torch import nn
 
@@ -21,7 +19,6 @@ from efg.modeling.operators.nms import generalized_batched_nms
 from efg.modeling.post_processing.postprocessing import detector_postprocess
 from efg.utils.logger import log_first_n
 
-from easydict import EasyDict as edict
 from matcher import Matcher
 
 
@@ -74,7 +71,7 @@ def build_backbone(config, input_shape=None):
 
 
 def build_anchor_generator(config, input_shape):
-    return DefaultAnchorGenerator(edict(OmegaConf.to_container(config.model.anchor_generator)), input_shape)
+    return DefaultAnchorGenerator(config.model.anchor_generator, input_shape)
 
 
 class RetinaNet(nn.Module):

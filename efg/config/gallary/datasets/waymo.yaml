@@ -1,5 +1,5 @@
 detection:
-    version: 1.3.2  # 1.2.0
+    version: 1.3.2
     source:
         local1f:
             root: ${oc.env:EFG_PATH}/datasets/waymo

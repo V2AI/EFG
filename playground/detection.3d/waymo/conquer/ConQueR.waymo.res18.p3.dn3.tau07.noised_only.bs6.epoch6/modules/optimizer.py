@@ -55,17 +55,16 @@ class AdamWMulti:
             param_groups = []
             backbone_group, other_group = model_params
 
-            with omegaconf.open_dict(optim_config):
-                lr_backbone = optim_config.pop("lr_backbone", optim_config["lr"])
+            lr_backbone = optim_config.pop("lr_backbone", optim_config["lr"])
 
-                for group in backbone_group:
-                    group["lr"] = lr_backbone
-                    param_groups.append(group)
+            for group in backbone_group:
+                group["lr"] = lr_backbone
+                param_groups.append(group)
 
-                for group in other_group:
-                    if "lr_multi" in group:
-                        group["lr"] = optim_config["lr"] * group.pop("lr_multi")
-                    param_groups.append(group)
+            for group in other_group:
+                if "lr_multi" in group:
+                    group["lr"] = optim_config["lr"] * group.pop("lr_multi")
+                param_groups.append(group)
         else:
             param_groups = [{"lr": optim_config["lr"], "params": model_params}]
 

@@ -1,22 +1,22 @@
 includes:
     - ${oc.env:EFG_PATH}/efg/config/gallary/datasets/coco.yaml
+    - ${oc.env:EFG_PATH}/efg/config/gallary/backbones.yaml
 
 
 task: train
 
 
 dataset:
-    type: COCODataset
 
-    source: ${detection.source.local}
-    task: coco  # panoptic, keypoints, coco
+    type: ${coco_detection.dataset}  # default COCODataset
+    source: ${coco_detection.source.coco_2017} 
+
     with_gt: True
-
+    recompute_boxes: False
     format: BGR
     mask_format: polygon  # bitmask 
     filter_empty_annotations: True
     proposal_files_train: null
-
     num_classes: 80
 
     processors:
@@ -26,7 +26,7 @@ dataset:
                 max_size: 1333
                 sample_style: choice
             - RandomFlip:
-                p: 0.5
+                prob: 0.5
         val:
             - ResizeShortestEdge:
                 short_edge_length: 800
@@ -61,29 +61,14 @@ model:
         freeze_at: 2
     
     resnets:
-        num_classes: null 
         out_features: [res3, res4, res5]
-        num_groups: 1 
         depth: 50 
         norm: FrozenBN
-        activation:
-            type: ReLU
-            inplace: True
-        zero_init_residual: False
-        width_per_group: 64
         stride_in_1x1: True
-        res5_dilation: 1
-        res2_out_channels: 256
-        stem_out_channels: 64
-
-        deep_stem: False
 
     fpn: 
         in_features: [res3, res4, res5]
         out_channels: 256
-        norm: "" 
-        fuse_type: sum
-        block_in_features: p5
 
     anchor_generator:
         sizes: [[32, 64, 128, 256, 512]]

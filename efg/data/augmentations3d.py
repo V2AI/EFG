@@ -1,6 +1,4 @@
-import inspect
 import logging
-import pprint
 
 import numpy as np
 
@@ -13,6 +11,7 @@ from efg.geometry.box_ops import (  # mask_boxes_outside_range,; mask_boxes_outs
     rotate_points_along_z
 )
 
+from .augmentations import AugmentationBase
 from .db_sampler import DataBaseSampler
 from .registry import PROCESSORS
 from .voxel_generator import VoxelGenerator
@@ -31,55 +30,8 @@ def _dict_select(dict_, inds):
                 dict_[k] = v[inds[len(v)]]
 
 
-class Augmentation(object):
-    def _init(self, params=None):
-        if params and isinstance(params, dict):
-            for k, v in params.items():
-                if k != "self" and not k.startswith("_"):
-                    setattr(self, k, v)
-
-    def _rand_range(self, low=1.0, high=None, size=None):
-        """
-        Uniform float random number between low and high.
-        """
-        if high is None:
-            low, high = 0, low
-        if size is None:
-            size = []
-        return np.random.uniform(low, high, size)
-
-    def __repr__(self):
-        """
-        Produce something like:
-        "MyAugmentation(field1={self.field1}, field2={self.field2})"
-        """
-        try:
-            sig = inspect.signature(self.__init__)
-            classname = type(self).__name__
-            argstr = []
-            for name, param in sig.parameters.items():
-                assert (
-                    param.kind != param.VAR_POSITIONAL and param.kind != param.VAR_KEYWORD
-                ), "The default __repr__ doesn't support *args or **kwargs"
-                assert hasattr(
-                    self, name
-                ), f"Attribute {name} not found! Default __repr__ only works if attributes match the constructor."
-                attr = getattr(self, name)
-                default = param.default
-                if default is attr:
-                    continue
-                attr_str = pprint.pformat(attr)
-                if "\n" in attr_str:
-                    # don't show it if pformat decides to use >1 lines
-                    attr_str = "..."
-                argstr.append("{}={}".format(name, attr_str))
-            return "{}({})".format(classname, ", ".join(argstr))
-        except AssertionError:
-            return super().__repr__()
-
-
 @PROCESSORS.register()
-class FilterByDifficulty(Augmentation):
+class FilterByDifficulty(AugmentationBase):
     def __init__(self, filter_difficulties):
         super().__init__()
         self._init(locals())
@@ -103,7 +55,7 @@ class FilterByDifficulty(Augmentation):
 
 
 @PROCESSORS.register()
-class DatabaseSampling(Augmentation):
+class DatabaseSampling(AugmentationBase):
     def __init__(self, db_info_path, sample_groups, min_points=0, difficulty=-1, p=1.0, rm_points_after_sample=False):
         super().__init__()
 
@@ -162,7 +114,7 @@ class DatabaseSamplingSim(DatabaseSampling):
 
 
 @PROCESSORS.register()
-class PointShuffle(Augmentation):
+class PointShuffle(AugmentationBase):
     def __init__(self, p=0.5):
         super().__init__()
         self._init(locals())
@@ -174,7 +126,7 @@ class PointShuffle(Augmentation):
 
 
 @PROCESSORS.register()
-class RandomFlip3D(Augmentation):
+class RandomFlip3D(AugmentationBase):
     def __init__(self, p=0.5):
         super().__init__()
         self._init(locals())
@@ -220,7 +172,7 @@ class RandomFlip3D(Augmentation):
 
 
 @PROCESSORS.register()
-class GlobalRotation(Augmentation):
+class GlobalRotation(AugmentationBase):
     def __init__(self, rotation):
         super().__init__()
         if not isinstance(rotation, list):
@@ -253,7 +205,7 @@ class GlobalRotation(Augmentation):
 
 
 @PROCESSORS.register()
-class GlobalScaling(Augmentation):
+class GlobalScaling(AugmentationBase):
     def __init__(self, min_scale, max_scale):
         super().__init__()
         self._init(locals())
@@ -271,7 +223,7 @@ class GlobalScaling(Augmentation):
 
 
 @PROCESSORS.register()
-class GlobalTranslation(Augmentation):
+class GlobalTranslation(AugmentationBase):
     def __init__(self, std=[0, 0, 0]):
         super()._init(locals())
 
@@ -289,7 +241,7 @@ class GlobalTranslation(Augmentation):
 
 
 @PROCESSORS.register()
-class PointsJitter(Augmentation):
+class PointsJitter(AugmentationBase):
     def __init__(self, jitter_std=[0.01, 0.01, 0.01], clip_range=[-0.05, 0.05]):
         super()._init(locals())
 
@@ -304,7 +256,7 @@ class PointsJitter(Augmentation):
 
 
 @PROCESSORS.register()
-class Voxelization(Augmentation):
+class Voxelization(AugmentationBase):
     def __init__(self, pc_range, voxel_size, max_points_in_voxel, max_voxel_num):
         super().__init__()
         self._init(locals())
@@ -335,7 +287,7 @@ class Voxelization(Augmentation):
 
 
 @PROCESSORS.register()
-class FilterByRange(Augmentation):
+class FilterByRange(AugmentationBase):
     def __init__(self, pc_range, with_gt=True):
         super().__init__()
         pc_range = np.array(list(pc_range))
@@ -377,7 +329,7 @@ class FilterByRangeXY(FilterByRange):
 
 
 @PROCESSORS.register()
-class RandomCropPoints(Augmentation):
+class RandomCropPoints(AugmentationBase):
     def __init__(self, crop_type, crop_size, pc_range, p=0.5):
         """
         Args:
@@ -491,12 +443,3 @@ class RandomCropPoints(Augmentation):
     def apply_coords(self, coords: np.ndarray, center_offset: np.ndarray) -> np.ndarray:
         coords[:, :2] -= center_offset
         return coords
-
-
-def build_processors(pipelines):
-    transforms = []
-    for pipeline in pipelines:
-        for name, args in pipeline.items():
-            transform = PROCESSORS.get(name)(**args)
-            transforms.append(transform)
-    return transforms

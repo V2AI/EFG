@@ -11,6 +11,7 @@ import portalocker
 from .download import download
 
 __all__ = ["PathHandler", "PathManager", "get_cache_dir", "file_lock"]
+logger = logging.getLogger(__name__)
 
 
 def get_cache_dir(cache_dir: Optional[str] = None) -> str:
@@ -268,10 +269,7 @@ class HTTPURLHandler(PathHandler):
         return self.cache_map[path]
 
     def _open(self, path: str, mode: str = "r") -> IO[Any]:
-        assert mode in (
-            "r",
-            "rb",
-        ), "{} does not support open with {} mode".format(self.__class__.__name__, mode)
+        assert mode in ("r", "rb"), "{} does not support open with {} mode".format(self.__class__.__name__, mode)
         local_path = self._get_local_path(path)
         return open(local_path, mode)
 
@@ -443,11 +441,7 @@ class PathManager:
         # Sort path handlers in reverse order so longer prefixes take priority,
         # eg: http://foo/bar before http://foo
         PathManager._PATH_HANDLERS = OrderedDict(
-            sorted(
-                PathManager._PATH_HANDLERS.items(),
-                key=lambda t: t[0],
-                reverse=True,
-            )
+            sorted(PathManager._PATH_HANDLERS.items(), key=lambda t: t[0], reverse=True)
         )
 
 

@@ -8,10 +8,12 @@ import numpy as np
 
 import torch
 
-from efg.data.augmentations3d import _dict_select, build_processors
+from efg.data.augmentations import build_processors
+from efg.data.augmentations3d import _dict_select
 from efg.data.base_dataset import BaseDataset
 from efg.data.datasets.utils import read_single_waymo, read_single_waymo_sweep
 from efg.data.registry import DATASETS
+from efg.utils.file_io import PathManager
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +56,7 @@ class WaymoDetectionDataset(BaseDataset):
         logger.info(f"Building data processors: {self.transforms}")
 
     def load_infos(self):
-        with open(self.info_path, "rb") as f:
-            waymo_infos_all = pickle.load(f)
+        waymo_infos_all = pickle.load(PathManager.open(self.info_path, "rb"))
         return waymo_infos_all[:: self.load_interval]
 
     def __len__(self):
@@ -63,12 +64,14 @@ class WaymoDetectionDataset(BaseDataset):
 
     def __getitem__(self, idx):
         info = deepcopy(self.dataset_dicts[idx])
-        # load point cloud data
-        if not os.path.isabs(info["path"]):
-            info["path"] = os.path.join(self.root_path, info["path"])
-        with open(info["path"], "rb") as f:
-            obj = pickle.load(f)
 
+        # load point cloud data
+        if "s3" not in self.root_path:
+            if not os.path.isabs(info["path"]):
+                info["path"] = os.path.join(self.root_path, info["path"])
+        else:
+            info["path"] = self.root_path.replace("Waymo", "Waymo/v1.3.2") + "/" + info["path"]
+        obj = pickle.load(PathManager.open(info["path"], "rb"))
         points = read_single_waymo(obj)
 
         nsweeps = self.nsweeps
@@ -82,8 +85,9 @@ class WaymoDetectionDataset(BaseDataset):
 
             for i in range(nsweeps - 1):
                 sweep = info["sweeps"][i]
-                with open(sweep["path"], "rb") as f:
-                    sweep_obj = pickle.load(f)
+                if "s3" in self.root_path:
+                    sweep["path"] = self.root_path.replace("Waymo", "Waymo/v1.3.2") + "/" + sweep["path"]
+                sweep_obj = pickle.load(PathManager.open(sweep["path"], "rb"))
                 points_sweep, times_sweep = read_single_waymo_sweep(sweep, sweep_obj)
                 sweep_points_list.append(points_sweep)
                 sweep_times_list.append(times_sweep)

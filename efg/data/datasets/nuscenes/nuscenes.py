@@ -1,13 +1,16 @@
 import logging
+import os
 import pickle
 from copy import deepcopy
 
 import numpy as np
 
-from efg.data.augmentations3d import _dict_select, build_processors
+from efg.data.augmentations import build_processors
+from efg.data.augmentations3d import _dict_select
 from efg.data.base_dataset import BaseDataset
 from efg.data.datasets.nuscenes.nusc_common import cls_attr_dist, general_to_detection, read_file, read_sweep
 from efg.data.registry import DATASETS
+from efg.utils.file_io import PathManager
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +84,7 @@ class nuScenesDetectionDataset(BaseDataset):
         return meta
 
     def load_infos(self):
-        with open(self.info_path, "rb") as f:
-            _nusc_infos_all = pickle.load(f)
+        _nusc_infos_all = pickle.load(PathManager.open(self.info_path, "rb"))
 
         if self.is_train:  # if training
             self.frac = int(len(_nusc_infos_all) * 0.25)
@@ -123,8 +125,10 @@ class nuScenesDetectionDataset(BaseDataset):
     def __getitem__(self, idx):
         info = deepcopy(self.dataset_dicts[idx])
 
-        if info["lidar_path"].startswith("datasets/nuscenes"):
-            lidar_path = info["lidar_path"].replace("datasets/nuscenes", "/cache/bjzhu/datasets/nuScenes")
+        if "s3" in self.info_path:
+            lidar_path = info["lidar_path"].replace("datasets/nuscenes", "s3://Datasets/nuScenes")
+        elif info["lidar_path"].startswith("datasets/nuscenes"):
+            lidar_path = os.path.join(os.environ["EFG_PATH"], info["lidar_path"])
 
         points = read_file(lidar_path)
 
@@ -140,8 +144,10 @@ class nuScenesDetectionDataset(BaseDataset):
         for i in range(nsweeps - 1):
             sweep = info["sweeps"][i]
 
-            if sweep["lidar_path"].startswith("datasets/nuscenes"):
-                slidar_path = sweep["lidar_path"].replace("datasets/nuscenes", "/cache/bjzhu/datasets/nuScenes")
+            if "s3" in self.info_path:
+                slidar_path = sweep["lidar_path"].replace("datasets/nuscenes", "s3://Datasets/nuScenes")
+            elif sweep["lidar_path"].startswith("datasets/nuscenes"):
+                slidar_path = os.path.join(os.environ["EFG_PATH"], sweep["lidar_path"])
             sweep["lidar_path"] = slidar_path
 
             points_sweep, times_sweep = read_sweep(sweep)

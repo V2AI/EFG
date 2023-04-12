@@ -2,13 +2,22 @@
 task: train  # train, val, test 
 
 
-dataset: null
+dataset: 
+    compose_type: ConcatDataset 
+
+    processors: 
+        train: 
+            - NoOpAugmentation 
+        val: 
+            - NoOpAugmentation 
+        test: 
+            - NoOpAugmentation 
 
 
 # model
 model:
     device: cuda
-    weights: null
+    weights: "" 
 
 dataloader:
     sampler: DistributedInfiniteSampler

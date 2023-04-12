@@ -199,7 +199,7 @@ class PeriodicWriter(HookBase):
             or (self.trainer.iter == 0)
         ):
             for writer in self._writers:
-                writer.write()
+                writer.write(self._period)
 
     def after_train(self):
         for writer in self._writers:

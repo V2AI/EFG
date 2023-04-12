@@ -6,6 +6,8 @@ import weakref
 from typing import Dict
 
 import numpy as np
+from easydict import EasyDict as edict
+from omegaconf import OmegaConf
 
 import torch
 from torch.nn.parallel import DistributedDataParallel
@@ -16,7 +18,7 @@ from efg.evaluator.evaluator import inference_on_dataset
 from efg.solver import build_optimizer, build_scheduler
 from efg.utils import distributed as comm
 from efg.utils.checkpoint import Checkpointer
-from efg.utils.events import CommonMetricPrinter, EventStorage, get_event_storage
+from efg.utils.events import CommonMetricPrinter, EventStorage, JSONWriter, TensorboardXWriter, get_event_storage
 from efg.utils.file_io import PathManager
 
 from .registry import TRAINERS
@@ -60,7 +62,7 @@ class TrainerBase:
             for self.iter in range(self.start_iter, self.max_iters):
                 if self.iter % (self.config.trainer.window_size * 20) == 0:
                     logger.info(f"Host Name: {socket.gethostname()}")
-                    logger.info(f"Experiment Dir: {self.config.trainer.output_dir.split('EFG/')[-1]}")
+                    logger.info(f"Experiment Dir: {self.config.trainer.output_dir.split('EFG.private/')[-1]}")
                 self.before_step()
                 # by default, a step contains data_loading and model forward,
                 # loss backward is executed in after_step for better expansibility
@@ -131,14 +133,12 @@ class TrainerBase:
 
 @TRAINERS.register()
 class DefaultTrainer(TrainerBase):
-    def __init__(self, configuration):
+    def __init__(self, config):
         super(DefaultTrainer, self).__init__()
-
-        self.configuration = configuration
-        self.config = self.configuration.get_config()
+        self.omega_config = config
+        self.config = edict(OmegaConf.to_container(config, resolve=True))
         self.is_train = self.config.task == "train"
         self.setup()
-        self.configuration.freeze()
         logger.info("Finish trainer setup")
 
     def setup(self):
@@ -162,18 +162,23 @@ class DefaultTrainer(TrainerBase):
             if max_epochs is not None:
                 max_iters = len(self.dataloader) * max_epochs
                 self.config.solver.lr_scheduler.max_iters = max_iters
+                self.config.solver.lr_scheduler.epoch_iters = len(self.dataloader)
                 logger.info(f"Convert {max_epochs} epochs into {max_iters} iters")
 
             self._dataiter = iter(self.dataloader)
             logger.info(f"Finish dataloader setup: {self.dataloader}")
 
     def setup_model(self):
-        self.model = self.build_model(self.config)
+        model = self.build_model(self.config)
+
+        if hasattr(self.dataset, "meta"):
+            model.dataset_meta = self.dataset.meta
 
         if self.config.trainer.sync_bn and comm.is_dist_avail_and_initialized():
-            self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
+            self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
             logger.info(f"Model is converted into syncbn version: {self.model}")
         else:
+            self.model = model
             logger.info(f"Finish model setup: {self.model}")
 
         if self.is_train:
@@ -224,12 +229,11 @@ class DefaultTrainer(TrainerBase):
                 if matched.shape[0] > 0:
                     load_path = all_model_checkpoints[matched[0]]
                 else:
-                    logger.info(
-                        "Cannot find matched checkpoints as {self.config.model.weights}, try to load the latest."
-                    )
+                    logger.info(f"Cannot find matched checkpoints as {self.config.model.weights}, load the latest.")
                     load_path = all_model_checkpoints[-1]
             else:
                 load_path = all_model_checkpoints[-1]
+
             if resume and PathManager.isfile(load_path):
                 self.start_iter = self.checkpointer.load(load_path, resume=resume).get("iteration", -1) + 1
                 self.iter = self.start_iter
@@ -237,6 +241,8 @@ class DefaultTrainer(TrainerBase):
                     self.start_epochs = self.start_iter // len(self.dataloader)
             elif PathManager.isfile(load_path):
                 self.checkpointer.load(load_path)
+        elif PathManager.isfile(self.config.model.weights):
+            self.checkpointer.load(self.config.model.weights)
         else:
             logger.info("Checkpoint does not exist")
             raise ModuleNotFoundError
@@ -254,10 +260,13 @@ class DefaultTrainer(TrainerBase):
             elif self.config.trainer.checkpoint_iter is not None:
                 checkpoint_period = self.config.trainer.checkpoint_iter
             hooks.append(PeriodicCheckpoint(checkpoint_period))
+
             # run writers in the end, so that evaluation metrics are written
             window_size = self.config.trainer.window_size
             writers = [
-                CommonMetricPrinter(self.max_iters, window_size=window_size),
+                CommonMetricPrinter(self.max_iters),
+                JSONWriter(os.path.join(self.config.trainer.output_dir, "metrics.json")),
+                TensorboardXWriter(self.config.trainer.output_dir),
             ]
             hooks.append(PeriodicWriter(writers, period=window_size))
 

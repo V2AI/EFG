@@ -136,15 +136,21 @@ class Boxes:
 
     BoxSizeType = Union[List[int], Tuple[int, int]]
 
-    def __init__(self, tensor: torch.Tensor):
+    def __init__(self, tensor):
         """
         Args:
             tensor (Tensor[float]): a Nx4 matrix.  Each row is (x1, y1, x2, y2).
         """
-        device = tensor.device if isinstance(tensor, torch.Tensor) else torch.device("cpu")
-        tensor = torch.as_tensor(tensor, dtype=torch.float32, device=device)
+        if not isinstance(tensor, torch.Tensor):
+            if isinstance(tensor[0], np.ndarray):
+                tensor = np.array(tensor)
+            tensor = torch.as_tensor(tensor, dtype=torch.float32, device=torch.device("cpu"))
+        else:
+            tensor = tensor.to(torch.float32)
         if tensor.numel() == 0:
-            tensor = torch.zeros(0, 4, dtype=torch.float32, device=device)
+            # Use reshape, so we don't end up creating a new tensor that does not depend on
+            # the inputs (and consequently confuses jit)
+            tensor = tensor.reshape((-1, 4)).to(dtype=torch.float32)
         assert tensor.dim() == 2 and tensor.size(-1) == 4, tensor.size()
 
         self.tensor = tensor
@@ -455,7 +461,7 @@ def masks_to_boxes(masks):
 
     y = torch.arange(0, h, dtype=torch.float)
     x = torch.arange(0, w, dtype=torch.float)
-    y, x = torch.meshgrid(y, x)
+    y, x = torch.meshgrid(y, x, indexing="ij")
 
     x_mask = masks * x.unsqueeze(0)
     x_max = x_mask.flatten(1).max(-1)[0]
