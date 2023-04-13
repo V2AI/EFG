@@ -5,7 +5,6 @@ import os
 import time
 from collections import defaultdict
 from contextlib import contextmanager
-from functools import cached_property
 
 import torch
 
@@ -136,11 +135,8 @@ class TensorboardXWriter(EventWriter):
         self._writer_args = {"log_dir": log_dir, **kwargs}
         self._last_write = -1
 
-    @cached_property
-    def _writer(self):
         from torch.utils.tensorboard import SummaryWriter
-
-        return SummaryWriter(**self._writer_args)
+        self._writer = SummaryWriter(**self._writer_args)
 
     def write(self, window_size=20):
         storage = get_event_storage()
