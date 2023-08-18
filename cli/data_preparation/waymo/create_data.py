@@ -46,6 +46,20 @@ def veh_pos_to_transform(veh_pos):
 
     return global_from_car, car_from_global
 
+def transform_prebox_to_current(boxes3d,pose_pre,pose_cur):
+
+    expand_bboxes = np.concatenate([boxes3d[:,:3], np.ones((boxes3d.shape[0], 1))], axis=-1)
+    expand_vels = np.concatenate([boxes3d[:,[6,7]], np.zeros((boxes3d.shape[0], 1))], axis=-1)
+    bboxes_global = np.dot(expand_bboxes, pose_pre.T)[:, :3]
+    vels_global = np.dot(expand_vels, pose_pre[:3,:3].T)
+    expand_bboxes_global = np.concatenate([bboxes_global[:,:3],np.ones((bboxes_global.shape[0], 1))], axis=-1)
+    bboxes_pre2cur = np.dot(expand_bboxes_global, np.linalg.inv(pose_cur.T))[:, :3]
+    vels_pre2cur = np.dot(vels_global, np.linalg.inv(pose_cur[:3,:3].T))[:,:2]
+    bboxes_pre2cur = np.concatenate([bboxes_pre2cur, boxes3d[:,3:6],vels_pre2cur, boxes3d[:,8:9]],axis=-1)
+    bboxes_pre2cur[:,-1]  = bboxes_pre2cur[..., -1] + np.arctan2(pose_pre[..., 1, 0], pose_pre[..., 0,0])
+    bboxes_pre2cur[:,-1]  = bboxes_pre2cur[..., -1] - np.arctan2(pose_cur[..., 1, 0], pose_cur[..., 0,0])
+
+    return bboxes_pre2cur
 
 def _fill_infos(root_path, frames, split="train", nsweeps=1):
     # load all train infos
@@ -62,22 +76,27 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
 
         ref_pose = np.reshape(ref_obj["veh_to_global"], [4, 4])
         _, ref_from_global = veh_pos_to_transform(ref_pose)
-
         info = {
             "path": lidar_path,
             "anno_path": ref_path,
             "token": frame_name,
             "timestamp": ref_time,
+            "veh_to_global": ref_pose,
             "sweeps": [],
+            "frame_time": int(ref_obj['frame_name'].split("_")[-1]),
+            "context_name": ref_obj['scene_name']
         }
 
+        sequence_id = int(frame_name.split("_")[1])
+        frame_id = int(frame_name.split("_")[3][:-4])  # remove .pkl
         if split != "test":
             # read boxes
+
             annos = ref_obj["objects"]
             num_points_in_gt = np.array([ann["num_points"] for ann in annos])
             gt_boxes = np.array([ann["box"] for ann in annos]).reshape(-1, 9)
             difficulty = np.array([ann["detection_difficulty_level"] for ann in annos])
-
+            gt_ids = np.array([ann["name"] for ann in annos])
             gt_names = np.array([TYPE_LIST[ann["label"]] for ann in annos])
             mask_not_zero = (num_points_in_gt > 0).reshape(-1)
 
@@ -85,12 +104,11 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
             annos_dict = {}
             annos_dict["gt_boxes"] = gt_boxes[mask_not_zero, :].astype(np.float32)
             annos_dict["gt_names"] = gt_names[mask_not_zero].astype(str)
+            annos_dict["gt_ids"] = gt_ids[mask_not_zero]
             annos_dict["difficulty"] = difficulty[mask_not_zero].astype(np.int32)
             annos_dict["num_points_in_gt"] = num_points_in_gt[mask_not_zero].astype(np.int64)
             info["annotations"] = annos_dict
 
-        sequence_id = int(frame_name.split("_")[1])
-        frame_id = int(frame_name.split("_")[3][:-4])  # remove .pkl
 
         prev_id = frame_id
         sweeps = []
@@ -102,6 +120,12 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
                         "token": frame_name,
                         "transform_matrix": None,
                         "time_lag": 0,
+                        "veh_to_global": ref_obj["veh_to_global"],
+                        "gt_boxes": None,
+                        "gt_names": None,
+                        "difficulty": None,
+                        "name": None,
+                        "num_points_in_gt": None
                     }
                     sweeps.append(sweep)
                 else:
@@ -110,7 +134,6 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
                 prev_id = prev_id - 1
 
                 # global identifier
-
                 curr_name = "seq_{}_frame_{}.pkl".format(sequence_id, prev_id)
                 curr_lidar_path = os.path.join(split, "lidar", curr_name)
                 curr_label_path = os.path.join(split, "annos", curr_name)
@@ -120,7 +143,6 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
 
                 curr_pose = np.reshape(curr_obj["veh_to_global"], [4, 4])
                 global_from_car, _ = veh_pos_to_transform(curr_pose)
-
                 # tm = reduce(np.dot, [ref_from_global, global_from_car])
                 tm = ref_from_global.dot(global_from_car)
 
@@ -129,30 +151,30 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
 
                 sweep = {
                     "path": curr_lidar_path,
-                    "anno_path": curr_label_path,
                     "token": curr_name,
                     "transform_matrix": tm,
                     "time_lag": time_lag,
+                    "veh_to_global": curr_pose
                 }
 
                 if split != "test":
-                    sweep_annos = curr_obj["objects"]
-                    sweep_num_points_in_gt = np.array([ann["num_points"] for ann in sweep_annos])
-                    sweep_gt_boxes = np.array([ann["box"] for ann in sweep_annos]).reshape(-1, 9).T
-                    # transform gt boxes from veh to curr frame
-                    num_sweep_gt = sweep_gt_boxes.shape[1]
-                    sweep_gt_boxes[:3, :] = tm.dot(np.vstack((sweep_gt_boxes[:3, :], np.ones(num_sweep_gt))))[:3, :]
-                    sweep_gt_boxes = sweep_gt_boxes.T
-                    sweep_difficulty = np.array([ann["detection_difficulty_level"] for ann in sweep_annos])
-                    sweep_gt_names = np.array([TYPE_LIST[ann["label"]] for ann in sweep_annos])
-                    sweep_mask_not_zero = (sweep_num_points_in_gt > 0).reshape(-1)
+                    annos = curr_obj["objects"]
+                    num_points_in_gt = np.array([ann["num_points"] for ann in annos])
+                    gt_boxes = np.array([ann["box"] for ann in annos]).reshape(-1, 9)
+                    difficulty = np.array([ann["detection_difficulty_level"] for ann in annos])
+                    gt_ids = np.array([ann["name"] for ann in annos])
+                    gt_names = np.array([TYPE_LIST[ann["label"]] for ann in annos])
+                    mask_not_zero = (num_points_in_gt > 0).reshape(-1)
+                    # sweep['veh_to_global'] = curr_pose
 
                     # filter boxes without lidar points
                     sweep_annos_dict = {}
-                    sweep_annos_dict["gt_boxes"] = sweep_gt_boxes[sweep_mask_not_zero, :].astype(np.float32)
-                    sweep_annos_dict["gt_names"] = sweep_gt_names[sweep_mask_not_zero].astype(str)
-                    sweep_annos_dict["difficulty"] = sweep_difficulty[sweep_mask_not_zero].astype(np.int32)
-                    sweep_annos_dict["num_points_in_gt"] = sweep_num_points_in_gt[sweep_mask_not_zero].astype(np.int64)
+                    sweep_annos_dict["gt_boxes"] = transform_prebox_to_current(gt_boxes[mask_not_zero, :].astype(np.float32),
+                                                                    curr_pose,ref_pose)
+                    sweep_annos_dict["gt_names"] = gt_names[mask_not_zero].astype(str)
+                    sweep_annos_dict["difficulty"] = difficulty[mask_not_zero].astype(np.int32)
+                    sweep_annos_dict["gt_ids"] = gt_ids[mask_not_zero]
+                    sweep_annos_dict["num_points_in_gt"] = num_points_in_gt[mask_not_zero].astype(np.int64)
                     sweep["annotations"] = sweep_annos_dict
 
                 sweeps.append(sweep)
@@ -161,7 +183,6 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
         infos.append(info)
 
     return infos
-
 
 def _sort_frame(frames):
     indices = []

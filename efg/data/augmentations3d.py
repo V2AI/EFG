@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 def _dict_select(dict_, inds):
     for k, v in dict_.items():
+        if 'pred' in k  or "future" in k:
+            continue
         if isinstance(v, dict):
             _dict_select(v, inds)
         else:
@@ -28,7 +30,6 @@ def _dict_select(dict_, inds):
                 dict_[k] = v[inds]
             except IndexError:
                 dict_[k] = v[inds[len(v)]]
-
 
 @PROCESSORS.register()
 class FilterByDifficulty(AugmentationBase):
