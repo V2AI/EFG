@@ -41,25 +41,42 @@ def veh_pos_to_transform(veh_pos):
     rotation = veh_pos[:3, :3]
     translation = veh_pos[:3, 3]
 
-    global_from_car = transform_matrix(translation, Quaternion(matrix=rotation), inverse=False)
-    car_from_global = transform_matrix(translation, Quaternion(matrix=rotation), inverse=True)
+    global_from_car = transform_matrix(
+        translation, Quaternion(matrix=rotation), inverse=False
+    )
+    car_from_global = transform_matrix(
+        translation, Quaternion(matrix=rotation), inverse=True
+    )
 
     return global_from_car, car_from_global
 
-def transform_prebox_to_current(boxes3d,pose_pre,pose_cur):
 
-    expand_bboxes = np.concatenate([boxes3d[:,:3], np.ones((boxes3d.shape[0], 1))], axis=-1)
-    expand_vels = np.concatenate([boxes3d[:,[6,7]], np.zeros((boxes3d.shape[0], 1))], axis=-1)
+def transform_prebox_to_current(boxes3d, pose_pre, pose_cur):
+    expand_bboxes = np.concatenate(
+        [boxes3d[:, :3], np.ones((boxes3d.shape[0], 1))], axis=-1
+    )
+    expand_vels = np.concatenate(
+        [boxes3d[:, [6, 7]], np.zeros((boxes3d.shape[0], 1))], axis=-1
+    )
     bboxes_global = np.dot(expand_bboxes, pose_pre.T)[:, :3]
-    vels_global = np.dot(expand_vels, pose_pre[:3,:3].T)
-    expand_bboxes_global = np.concatenate([bboxes_global[:,:3],np.ones((bboxes_global.shape[0], 1))], axis=-1)
+    vels_global = np.dot(expand_vels, pose_pre[:3, :3].T)
+    expand_bboxes_global = np.concatenate(
+        [bboxes_global[:, :3], np.ones((bboxes_global.shape[0], 1))], axis=-1
+    )
     bboxes_pre2cur = np.dot(expand_bboxes_global, np.linalg.inv(pose_cur.T))[:, :3]
-    vels_pre2cur = np.dot(vels_global, np.linalg.inv(pose_cur[:3,:3].T))[:,:2]
-    bboxes_pre2cur = np.concatenate([bboxes_pre2cur, boxes3d[:,3:6],vels_pre2cur, boxes3d[:,8:9]],axis=-1)
-    bboxes_pre2cur[:,-1]  = bboxes_pre2cur[..., -1] + np.arctan2(pose_pre[..., 1, 0], pose_pre[..., 0,0])
-    bboxes_pre2cur[:,-1]  = bboxes_pre2cur[..., -1] - np.arctan2(pose_cur[..., 1, 0], pose_cur[..., 0,0])
+    vels_pre2cur = np.dot(vels_global, np.linalg.inv(pose_cur[:3, :3].T))[:, :2]
+    bboxes_pre2cur = np.concatenate(
+        [bboxes_pre2cur, boxes3d[:, 3:6], vels_pre2cur, boxes3d[:, 8:9]], axis=-1
+    )
+    bboxes_pre2cur[:, -1] = bboxes_pre2cur[..., -1] + np.arctan2(
+        pose_pre[..., 1, 0], pose_pre[..., 0, 0]
+    )
+    bboxes_pre2cur[:, -1] = bboxes_pre2cur[..., -1] - np.arctan2(
+        pose_cur[..., 1, 0], pose_cur[..., 0, 0]
+    )
 
     return bboxes_pre2cur
+
 
 def _fill_infos(root_path, frames, split="train", nsweeps=1):
     # load all train infos
@@ -83,8 +100,8 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
             "timestamp": ref_time,
             "veh_to_global": ref_pose,
             "sweeps": [],
-            "frame_time": int(ref_obj['frame_name'].split("_")[-1]),
-            "context_name": ref_obj['scene_name']
+            "frame_name": int(ref_obj["frame_name"].split("_")[-1]),
+            "scene_name": ref_obj["scene_name"],
         }
 
         sequence_id = int(frame_name.split("_")[1])
@@ -106,9 +123,10 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
             annos_dict["gt_names"] = gt_names[mask_not_zero].astype(str)
             annos_dict["gt_ids"] = gt_ids[mask_not_zero]
             annos_dict["difficulty"] = difficulty[mask_not_zero].astype(np.int32)
-            annos_dict["num_points_in_gt"] = num_points_in_gt[mask_not_zero].astype(np.int64)
+            annos_dict["num_points_in_gt"] = num_points_in_gt[mask_not_zero].astype(
+                np.int64
+            )
             info["annotations"] = annos_dict
-
 
         prev_id = frame_id
         sweeps = []
@@ -121,12 +139,8 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
                         "transform_matrix": None,
                         "time_lag": 0,
                         "veh_to_global": ref_obj["veh_to_global"],
-                        "gt_boxes": None,
-                        "gt_names": None,
-                        "difficulty": None,
-                        "name": None,
-                        "num_points_in_gt": None
                     }
+                    sweeps["annotations"] = annos_dict
                     sweeps.append(sweep)
                 else:
                     sweeps.append(sweeps[-1])
@@ -154,14 +168,16 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
                     "token": curr_name,
                     "transform_matrix": tm,
                     "time_lag": time_lag,
-                    "veh_to_global": curr_pose
+                    "veh_to_global": curr_pose,
                 }
 
                 if split != "test":
                     annos = curr_obj["objects"]
                     num_points_in_gt = np.array([ann["num_points"] for ann in annos])
                     gt_boxes = np.array([ann["box"] for ann in annos]).reshape(-1, 9)
-                    difficulty = np.array([ann["detection_difficulty_level"] for ann in annos])
+                    difficulty = np.array(
+                        [ann["detection_difficulty_level"] for ann in annos]
+                    )
                     gt_ids = np.array([ann["name"] for ann in annos])
                     gt_names = np.array([TYPE_LIST[ann["label"]] for ann in annos])
                     mask_not_zero = (num_points_in_gt > 0).reshape(-1)
@@ -169,12 +185,19 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
 
                     # filter boxes without lidar points
                     sweep_annos_dict = {}
-                    sweep_annos_dict["gt_boxes"] = transform_prebox_to_current(gt_boxes[mask_not_zero, :].astype(np.float32),
-                                                                    curr_pose,ref_pose)
+                    sweep_annos_dict["gt_boxes"] = transform_prebox_to_current(
+                        gt_boxes[mask_not_zero, :].astype(np.float32),
+                        curr_pose,
+                        ref_pose,
+                    )
                     sweep_annos_dict["gt_names"] = gt_names[mask_not_zero].astype(str)
-                    sweep_annos_dict["difficulty"] = difficulty[mask_not_zero].astype(np.int32)
+                    sweep_annos_dict["difficulty"] = difficulty[mask_not_zero].astype(
+                        np.int32
+                    )
                     sweep_annos_dict["gt_ids"] = gt_ids[mask_not_zero]
-                    sweep_annos_dict["num_points_in_gt"] = num_points_in_gt[mask_not_zero].astype(np.int64)
+                    sweep_annos_dict["num_points_in_gt"] = num_points_in_gt[
+                        mask_not_zero
+                    ].astype(np.int64)
                     sweep["annotations"] = sweep_annos_dict
 
                 sweeps.append(sweep)
@@ -183,6 +206,7 @@ def _fill_infos(root_path, frames, split="train", nsweeps=1):
         infos.append(info)
 
     return infos
+
 
 def _sort_frame(frames):
     indices = []
@@ -219,11 +243,16 @@ def create_waymo_infos(root_path, split="train", nsweeps=1):
 
     print(f"sample: {len(waymo_infos)}")
 
-    with open(os.path.join(root_path, "infos_" + split + f"_{nsweeps:02d}sweeps_sampled.pkl"), "wb") as f:
+    with open(
+        os.path.join(root_path, "infos_" + split + f"_{nsweeps:02d}sweeps_sampled.pkl"),
+        "wb",
+    ) as f:
         pickle.dump(waymo_infos, f)
 
 
-def _get_sensor_data(index, dataset_infos, root_path, nsweeps=1, point_features=5, test_mode=True):
+def _get_sensor_data(
+    index, dataset_infos, root_path, nsweeps=1, point_features=5, test_mode=True
+):
     info = dataset_infos[index]
 
     sample = {
@@ -269,9 +298,14 @@ def create_groundtruth_database(
         test_mode = False
 
     if db_path is None:
-        db_path = os.path.join(root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled")
+        db_path = os.path.join(
+            root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled"
+        )
     if dbinfo_path is None:
-        dbinfo_path = os.path.join(root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled_infos.pkl")
+        dbinfo_path = os.path.join(
+            root_path,
+            f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled_infos.pkl",
+        )
     if not os.path.exists(db_path):
         os.makedirs(db_path)
 
@@ -367,7 +401,10 @@ def create_groundtruth_database(
 
                 if relative_path:
                     db_dump_path = os.path.join(
-                        f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled", names[i], db_prefix, filename
+                        f"gt_database_train_{nsweeps:02d}sweeps_withvelo_sampled",
+                        names[i],
+                        db_prefix,
+                        filename,
                     )
                 else:
                     db_dump_path = filepath
@@ -414,7 +451,11 @@ if __name__ == "__main__":
 
     create_waymo_infos(args.root_path, args.split, args.nsweeps)
 
-    info_path = os.path.join(args.root_path, "infos_" + args.split + f"_{args.nsweeps:02d}sweeps_sampled.pkl")
+    info_path = os.path.join(
+        args.root_path, "infos_" + args.split + f"_{args.nsweeps:02d}sweeps_sampled.pkl"
+    )
 
     if args.split == "train":
-        create_groundtruth_database(args.root_path, info_path=info_path, nsweeps=args.nsweeps)
+        create_groundtruth_database(
+            args.root_path, info_path=info_path, nsweeps=args.nsweeps
+        )
