@@ -28,19 +28,19 @@ dataset:
 
     processors:
         train:
-            - RandomFlip3D:
+            - CusTomRandomFlip3D:
                  p: 0.5
-            - GlobalRotation:
+            - CusTomGlobalRotation:
                  rotation: 0.78539816  # -n ~ n
-            - GlobalScaling:
+            - CusTomGlobalScaling:
                  min_scale: 0.95
                  max_scale: 1.05
-            - FilterByRange:
+            - CusTomFilterByRange:
                 pc_range: ${dataset.pc_range} 
             - PointShuffle:
                 p: 1.0
         val:
-            - FilterByRange:
+            - CusTomFilterByRange:
                 pc_range: ${dataset.pc_range} 
                 with_gt: False
 

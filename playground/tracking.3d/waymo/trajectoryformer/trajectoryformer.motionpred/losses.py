@@ -14,6 +14,7 @@ class WeightedSmoothL1Loss(nn.Module):
                   | abs(x) - 0.5 * beta   otherwise,
     where x = input - target.
     """
+
     def __init__(self, beta: float = 1.0 / 9.0, code_weights: list = None):
         """
         Args:
@@ -38,11 +39,13 @@ class WeightedSmoothL1Loss(nn.Module):
             loss = torch.abs(diff)
         else:
             n = torch.abs(diff)
-            loss = torch.where(n < beta, 0.5 * n ** 2 / beta, n - 0.5 * beta)
+            loss = torch.where(n < beta, 0.5 * n**2 / beta, n - 0.5 * beta)
 
         return loss
 
-    def forward(self, input: torch.Tensor, target: torch.Tensor, weights: torch.Tensor = None):
+    def forward(
+        self, input: torch.Tensor, target: torch.Tensor, weights: torch.Tensor = None
+    ):
         """
         Args:
             input: (B, #anchors, #codes) float tensor.
@@ -66,8 +69,9 @@ class WeightedSmoothL1Loss(nn.Module):
 
         # anchor-wise weighting
         if weights is not None:
-            assert weights.shape[0] == loss.shape[0] and weights.shape[1] == loss.shape[1]
+            assert (
+                weights.shape[0] == loss.shape[0] and weights.shape[1] == loss.shape[1]
+            )
             loss = loss * weights.unsqueeze(-1)
 
         return loss
-

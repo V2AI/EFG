@@ -11,9 +11,9 @@ from efg.data.datasets.waymo import CAT_TO_IDX, LABEL_TO_TYPE
 from efg.geometry.box_ops_torch import limit_period
 from efg.utils import distributed as comm
 
+
 @EVALUATORS.register()
 class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
-
     def __init__(self, config, output_dir, dataset=None):
         self.config = config
         self._distributed = comm.is_dist_avail_and_initialized()
@@ -40,30 +40,36 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
                 return {}
 
         if self._local_eval:
-
             classes = np.array([CAT_TO_IDX[name] for name in self._classes])
 
             for target, output in zip(self._infos, self._predictions):
-
                 try:
                     target["annotations"]["labels"] = np.array(
-                        [LABEL_TO_TYPE[label] for label in target["annotations"]["labels"]]
+                        [
+                            LABEL_TO_TYPE[label]
+                            for label in target["annotations"]["labels"]
+                        ]
                     )
                 except:
                     target["annotations"]["labels"] = np.array(
-                        [LABEL_TO_TYPE[label] for label in target["annotations"]["labels"].cpu().numpy()]
+                        [
+                            LABEL_TO_TYPE[label]
+                            for label in target["annotations"]["labels"].cpu().numpy()
+                        ]
                     )
                 target["annotations"]["gt_boxes"][:, -1] = limit_period(
-                    target["annotations"]["gt_boxes"][:, -1], offset=0.5, period=np.pi * 2
+                    target["annotations"]["gt_boxes"][:, -1],
+                    offset=0.5,
+                    period=np.pi * 2,
                 )
-                
+
                 if self.config.eval_classes != self._classes:
-                    if   self.config.eval_classes == 'VEHICLE':
-                        mask = output["track_labels"]==1
-                    elif self.config.eval_classes == 'PEDESTRIAN':
-                        mask = output["track_labels"]==2
-                    elif self.config.eval_classes == 'CYCLIST':
-                        mask = output["track_labels"]==3
+                    if self.config.eval_classes == "VEHICLE":
+                        mask = output["track_labels"] == 1
+                    elif self.config.eval_classes == "PEDESTRIAN":
+                        mask = output["track_labels"] == 2
+                    elif self.config.eval_classes == "CYCLIST":
+                        mask = output["track_labels"] == 3
                     output["track_labels"] = output["track_labels"][mask]
                     output["track_scores"] = output["track_scores"][mask]
                     output["track_boxes3d"] = output["track_boxes3d"][mask]
@@ -86,13 +92,17 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
 
             torch.save(processed_results, self.res_path)
             print("Start local waymo tracking evaluation...")
-            result_path = self.create_pd_detection(processed_results, self._output_dir, name='pred')
-            gt_path = self.create_gt_detection(processed_results, self._output_dir,  name='gt')
-            cmd = "%s  %s  %s" % ( self.metrics_path, result_path, gt_path)
+            result_path = self.create_pd_detection(
+                processed_results, self._output_dir, name="pred"
+            )
+            gt_path = self.create_gt_detection(
+                processed_results, self._output_dir, name="gt"
+            )
+            cmd = "%s  %s  %s" % (self.metrics_path, result_path, gt_path)
             result = os.popen(cmd).read()
             print(result)
-  
-            with open(self._output_dir +'/tracking_result.txt', 'w') as f:
+
+            with open(self._output_dir + "/tracking_result.txt", "w") as f:
                 f.write(result)
 
     def create_pd_detection(self, detections, result_path, name, tracking=True):
@@ -101,7 +111,7 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
         from waymo_open_dataset.protos import metrics_pb2
 
         objects = metrics_pb2.Objects()
-        infos = np.load(self.root_path + self.val_path,"rb",True)
+        infos = np.load(self.root_path + self.val_path, "rb", True)
         infos = reorganize_info(infos)
         for token, detection in tqdm(detections.items()):
             info = infos[token]
@@ -110,17 +120,17 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
             labels = detection["track_labels"].numpy()
 
             if tracking:
-                tracking_ids = detection['track_ids']
+                tracking_ids = detection["track_ids"]
 
             for i in range(box3d.shape[0]):
-                det  = box3d[i]
+                det = box3d[i]
                 score = scores[i]
 
                 label = int(labels[i])
 
                 o = metrics_pb2.Object()
-                o.context_name = info['context_name']
-                o.frame_timestamp_micros = info['frame_time']
+                o.context_name = info["scene_name"]
+                o.frame_timestamp_micros = info["frame_name"]
 
                 # Populating box and score.
                 box = label_pb2.Label.Box()
@@ -134,7 +144,7 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
                 o.object.box.CopyFrom(box)
                 o.score = score
                 # Use correct type.
-                o.object.type = LABEL_TO_TYPE[label] 
+                o.object.type = LABEL_TO_TYPE[label]
 
                 if tracking:
                     o.object.id = uuid_gen.get_uuid(int(tracking_ids[i]))
@@ -142,9 +152,9 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
                 objects.objects.append(o)
 
         # Write objects to a file.
-        path = os.path.join(result_path, '%s.bin' % name)
+        path = os.path.join(result_path, "%s.bin" % name)
         print("PRED results saved to {}".format(path))
-        f = open(path, 'wb')
+        f = open(path, "wb")
         f.write(objects.SerializeToString())
         f.close()
         return path
@@ -153,32 +163,32 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
         """Creates a gt prediction object file for local evaluation."""
         from waymo_open_dataset import label_pb2
         from waymo_open_dataset.protos import metrics_pb2
-        
+
         objects = metrics_pb2.Objects()
-        infos = np.load(self.root_path + self.val_path,"rb",True)
+        infos = np.load(self.root_path + self.val_path, "rb", True)
         infos = reorganize_info(infos)
         for token, detection in tqdm(detections.items()):
             info = infos[token]
-            names = info["annotations"]['gt_names']
-            num_points_in_gt = info["annotations"]['num_points_in_gt']
-            box3d = info["annotations"]['gt_boxes'][:, [0, 1, 2, 3, 4, 5, -1]]
+            names = info["annotations"]["gt_names"]
+            num_points_in_gt = info["annotations"]["num_points_in_gt"]
+            box3d = info["annotations"]["gt_boxes"][:, [0, 1, 2, 3, 4, 5, -1]]
 
             if len(box3d) == 0:
-                continue 
+                continue
 
             for i in range(box3d.shape[0]):
                 if num_points_in_gt[i] == 0:
-                    continue 
-                if names[i] == 'UNKNOWN':
-                    continue 
+                    continue
+                if names[i] == "UNKNOWN":
+                    continue
 
-                det  = box3d[i]
+                det = box3d[i]
                 score = 1.0
                 label = names[i]
 
                 o = metrics_pb2.Object()
-                o.context_name = info['context_name']
-                o.frame_timestamp_micros = info['frame_time']
+                o.context_name = info["scene_name"]
+                o.frame_timestamp_micros = info["frame_name"]
 
                 # Populating box and score.
                 box = label_pb2.Label.Box()
@@ -195,33 +205,37 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
                 o.object.type = CAT_TO_IDX[label]
                 o.object.num_lidar_points_in_box = num_points_in_gt[i]
                 if tracking:
-                    o.object.id = info["annotations"]['gt_ids'][i]
+                    o.object.id = info["annotations"]["gt_ids"][i]
 
                 objects.objects.append(o)
-            
+
         # Write objects to a file.
-        path = os.path.join(result_path, '%s.bin' % name)
+        path = os.path.join(result_path, "%s.bin" % name)
         print("GT results saved to {}".format(path))
-        f = open(path, 'wb')
+        f = open(path, "wb")
         f.write(objects.SerializeToString())
         f.close()
         return path
+
 
 def reorganize_info(infos):
     new_info = {}
 
     for info in infos:
-        token = info['token']
+        token = info["token"]
         new_info[token] = info
 
     return new_info
 
-class UUIDGeneration():
+
+class UUIDGeneration:
     def __init__(self):
         self.mapping = {}
-    def get_uuid(self,seed):
+
+    def get_uuid(self, seed):
         if seed not in self.mapping:
             self.mapping[seed] = uuid.uuid4().hex
         return self.mapping[seed]
+
 
 uuid_gen = UUIDGeneration()

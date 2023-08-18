@@ -23,17 +23,18 @@ dataset:
     score_thresh: 0
     nms_thresh: 0.1
     pc_range: [-75.2, -75.2, -2.0, 75.2, 75.2, 4.0]
+
     processors:
         train:
-            - RandomFlip3DFutureGT:
+            - CusTomRandomFlip3D:
                  p: 0.5
-            - GlobalRotationFutureGT:
+            - CusTomGlobalRotation:
                  rotation: 0.78539816  # -n ~ n
-            - GlobalScalingFutureGT:
+            - CusTomGlobalScaling:
                  min_scale: 0.95
                  max_scale: 1.05
         val:
-            - FilterByRange:
+            - CusTomFilterByRange:
                 pc_range: ${dataset.pc_range} 
                 with_gt: False
 
