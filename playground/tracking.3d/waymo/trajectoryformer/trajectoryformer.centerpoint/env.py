@@ -141,13 +141,12 @@ class CustomWDDataset(WaymoDetectionDataset):
 
             if 'centerpoint' in self.config.dataset.val_boxes_path:
                 labels = boxes_cur['pred_labels'].numpy()
-                label_mask = labels == 0
-                boxes3d = boxes_cur['pred_boxes3d'][label_mask].numpy()
+                boxes3d = boxes_cur['pred_boxes3d'].numpy()
                 boxes3d[:, -1] = -boxes3d[:, -1] - np.pi / 2
                 boxes3d = boxes3d[:, [0, 1, 2, 4, 3, 5, -1]]
-                vels_cur = boxes_cur['pred_vels'][label_mask].numpy()
-                scores_cur = boxes_cur['pred_scores'][label_mask].numpy()
-                labels_cur = labels[label_mask] + 1
+                vels_cur = boxes_cur['pred_vels'].numpy()
+                scores_cur = boxes_cur['pred_scores'].numpy()
+                labels_cur = labels + 1
             elif 'mppnet' in self.config.dataset.val_boxes_path:
                 labels = boxes_cur['pred_labels']
                 label_mask = labels >=1

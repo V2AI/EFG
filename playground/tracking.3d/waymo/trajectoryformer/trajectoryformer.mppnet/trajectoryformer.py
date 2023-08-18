@@ -10,7 +10,7 @@ from  modules.utils import Instances
 from  modules.utils import rotate_points_along_z, encode_boxes_res_torch, \
 decode_torch, transform_trajs_to_global_coords,transform_trajs_to_local_coords,  \
 get_corner_points_of_roi, spherical_coordinate, reorder_rois, \
-crop_current_frame_points,transform_box_to_global, transform_global_to_current
+crop_current_frame_points,transform_box_to_global, transform_global_to_current_torch
 from losses import WeightedSmoothL1Loss, get_corner_loss
 from transformer import TransformerEncoder, TransformerEncoderGlobalLocal,\
 TransformerEncoderLayer, TransformerEncoderLayerGlobalLocal
@@ -281,7 +281,7 @@ class TrajectoryFormer(nn.Module):
             traj_id = self.history_trajectory_bank[id.item()]
             boxes_cat = torch.cat([x for t, x in enumerate(traj_id['track_boxes3d'][:num_frames])],dim=0).reshape(-1,7).clone()
             vels_cat = torch.cat([x for t, x in enumerate(traj_id['track_vels'][:num_frames])],dim=0).reshape(-1,2).clone()
-            transfered_traj,transfered_vel = transform_global_to_current(boxes_cat.cpu(), vels_cat.cpu(), self.pose)
+            transfered_traj,transfered_vel = transform_global_to_current_torch(boxes_cat, vels_cat,pose_cur_cuda)
             traj[0,:boxes_cat.shape[0],k] = transfered_traj
             traj_vels[0,:vels_cat.shape[0],k] = transfered_vel
 

@@ -57,7 +57,8 @@ For MPPNet,
 # eval vehicle, pedestrian, cyclist
 cd playground/tracking.3d/waymo/trajectoryformer.mppnet;
 efg_run --num-gpus 8 task val \
-trainer.eval_metrics_path /path/to/your/tools 
+trainer.eval_metrics_path /path/to/your/tools
+model.eval_class VEHICLE or PEDESTRIAN or CYCLIST
 ```
 If you want the pretrained model, please contact `chenxuesong@link.cuhk.edu.hk`.
 

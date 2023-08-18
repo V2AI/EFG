@@ -186,7 +186,6 @@ def transform_global_to_current_torch(pred_boxes3d,pred_vels,global_from_ref,tim
     if time_lag > 0:
         moved_bboxes_global[:,:2] = moved_bboxes_global[:,:2] + time_lag*vels_global[:,:2]
     expand_bboxes_global = torch.cat([moved_bboxes_global[:,:3],torch.ones((pred_boxes3d.shape[0], 1)).cuda()], axis=-1)
-
     bboxes_global2cur = torch.mm(ref_from_global,expand_bboxes_global.t()).t()[:,:3]
     vels_global2cur = torch.mm(ref_from_global[:3,:3],vels_global.t()).t()[:,:2]
     bboxes_global2cur = torch.cat([bboxes_global2cur, pred_boxes3d[:,3:7]],axis=-1)

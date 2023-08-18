@@ -55,14 +55,6 @@ class CustomWDDataset(WaymoDetectionDataset):
 
         return boxes_all[::self.load_interval]
 
-    def __len__(self):
-
-        # if not hasattr(self, "dataset_dicts"):
-        #     return  len(list(range(0,158081,self.load_interval)))
-        # else:
-        return  len(self.boxes_dicts)
-
-
     def transform_prebox_to_current_vel(self,pred_boxes3d,pose_pre,pose_cur,idx):
 
         expand_bboxes = np.concatenate([pred_boxes3d[:,:3], np.ones((pred_boxes3d.shape[0], 1))], axis=-1)
@@ -138,16 +130,14 @@ class CustomWDDataset(WaymoDetectionDataset):
         boxes_cur = deepcopy(self.boxes_dicts[idx])
 
         if not self.is_train:
-
             if 'centerpoint' in self.config.dataset.val_boxes_path:
                 labels = boxes_cur['pred_labels'].numpy()
-                label_mask = labels == 0
-                boxes3d = boxes_cur['pred_boxes3d'][label_mask].numpy()
+                boxes3d = boxes_cur['pred_boxes3d'].numpy()
                 boxes3d[:, -1] = -boxes3d[:, -1] - np.pi / 2
                 boxes3d = boxes3d[:, [0, 1, 2, 4, 3, 5, -1]]
-                vels_cur = boxes_cur['pred_vels'][label_mask].numpy()
-                scores_cur = boxes_cur['pred_scores'][label_mask].numpy()
-                labels_cur = labels[label_mask] + 1
+                vels_cur = boxes_cur['pred_vels'].numpy()
+                scores_cur = boxes_cur['pred_scores'].numpy()
+                labels_cur = labels + 1
             elif 'mppnet' in self.config.dataset.val_boxes_path:
                 labels = boxes_cur['pred_labels']
                 label_mask = labels >=1
@@ -238,12 +228,10 @@ class CustomWDDataset(WaymoDetectionDataset):
                     boxes3d_pre = np.concatenate([boxes3d[:,:6],vels_pre,boxes3d[:,-1:],
                                                 scores_pre[:,None],labels_pre[:,None]],-1)
 
-
                     if frame_id ==0:
                         time_step=0
                     else:
                         time_step=1
-
                     if i==1:
                         pred_boxes_trans = self.transform_prebox_to_current_vel(boxes3d_pre,
                                                                         pose_pre=info_pre["veh_to_global"],\
