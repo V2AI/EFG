@@ -26,11 +26,11 @@ dataset:
 
     processors:
         train:
-            - CusTomRandomFlip3D:
+            - RandomFlip3DFutureGT:
                  p: 0.5
-            - CusTomGlobalRotation:
+            - GlobalRotationFutureGT:
                  rotation: 0.78539816  # -n ~ n
-            - CusTomGlobalScaling:
+            - GlobalScalingFutureGT:
                  min_scale: 0.95
                  max_scale: 1.05
         val:

@@ -4,6 +4,7 @@
 An Efficient, Flexible, and General deep learning framework that retains minimal. Users can use EFG to explore any research topics following project templates. 
 
 # What's New
+* 2023.08.22 Code release of ICCV2023 paper: [TrajectoryFormer: 3D Object Tracking Transformer with Predictive Trajectory Hypotheses](https://github.com/poodarchu/EFG/blob/master/playground/tracking.3d/waymo/trajectoryformer/README.md).
 * 2023.04.13 Support COCO Panoptic Segmentation with Mask2Former.
 * 2023.03.30 Support Pytorch 2.0.
 * 2023.03.21 Code release of CVPR2023 **Highlight** paper: [ConQueR: Query Contrast Voxel-DETR for 3D Object Detection](https://github.com/poodarchu/EFG/blob/master/playground/detection.3d/waymo/conquer/README.md).

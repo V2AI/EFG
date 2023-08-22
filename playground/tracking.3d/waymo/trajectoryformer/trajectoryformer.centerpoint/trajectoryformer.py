@@ -101,8 +101,7 @@ class TrajectoryFormer(nn.Module):
         self.cyc_embed = torch.tensor([0, 0, 1]).cuda().float().reshape(1, 1, 3)
         self.train_nms_thresh = self.config.dataset.nms_thresh
         self.train_score_thresh = self.config.dataset.score_thresh
-
-        ### eval ###
+        # eval
         self.max_id = 0
         self.WAYMO_TRACKING_NAMES = config.dataset.classes
         self.nms_thresh = self.config.model.nms_thresh
@@ -432,8 +431,7 @@ class TrajectoryFormer(nn.Module):
                 .clone()
             )
             transfered_traj, transfered_vel = transform_global_to_current_torch(
-                boxes_cat, vels_cat, pose_cur_cuda 
-            )
+                boxes_cat, vels_cat, pose_cur_cuda)
             traj[0, : boxes_cat.shape[0], k] = transfered_traj
             traj_vels[0, : vels_cat.shape[0], k] = transfered_vel
 
@@ -1091,11 +1089,10 @@ class TrajectoryFormer(nn.Module):
 
     def get_pred_motion(self, traj, pred_vel=None):
         traj_rois = traj.clone().unsqueeze(3)
-        batch_size, len_traj, num_track, num_hypo = (
+        batch_size, len_traj, num_track = (
             traj_rois.shape[0],
             traj_rois.shape[1],
             traj_rois.shape[2],
-            traj_rois.shape[3],
         )
         self.num_future = 10  # pretrained motion model predict 10 future frames
         history_traj = traj_rois

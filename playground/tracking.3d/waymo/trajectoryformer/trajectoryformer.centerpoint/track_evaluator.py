@@ -50,7 +50,7 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
                         for label in target["annotations"]["labels"]
                     ]
                 )
-                
+
                 target["annotations"]["gt_boxes"][:, -1] = limit_period(
                     target["annotations"]["gt_boxes"][:, -1],
                     offset=0.5,

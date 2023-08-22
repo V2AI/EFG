@@ -1,12 +1,6 @@
 import logging
-
 import numpy as np
-
-from efg.geometry.box_ops import (
-    mask_boxes_outside_range_bev_z_bound,
-    mask_points_by_range,
-    rotate_points_along_z,
-)
+from efg.geometry.box_ops import rotate_points_along_z
 from efg.data.augmentations import AugmentationBase
 from efg.data.registry import PROCESSORS
 
@@ -28,37 +22,7 @@ def _dict_select(dict_, inds):
 
 
 @PROCESSORS.register()
-class CusTomFilterByRange(AugmentationBase):
-    def __init__(self, pc_range, with_gt=True):
-        super().__init__()
-        pc_range = np.array(list(pc_range))
-        self._init(locals())
-        self._set_filter_func()
-
-    def _set_filter_func(self):
-        self.filter_func = mask_boxes_outside_range_bev_z_bound
-
-    def _filter_annos(self, info):
-        assert "annotations" in info
-        target = info["annotations"]
-        keep = self.filter_func(target["gt_boxes"], self.pc_range)
-        _dict_select(target, keep)
-        return info
-
-    def __call__(self, points, info):
-        keep = mask_points_by_range(points, self.pc_range)
-        points = points[keep]
-        if self.with_gt:
-            if "annotations" in info:
-                info = self._filter_annos(info)
-                for sweep in info["sweeps"]:
-                    if "annotations" in sweep:
-                        sweep = self._filter_annos(sweep)
-        return points, info
-
-
-@PROCESSORS.register()
-class CusTomRandomFlip3D(AugmentationBase):
+class RandomFlip3DFutureGT(AugmentationBase):
     def __init__(self, p=0.5):
         super().__init__()
         self._init(locals())
@@ -72,6 +36,10 @@ class CusTomRandomFlip3D(AugmentationBase):
                 gt_boxes[:, 1] = -gt_boxes[:, 1]
                 gt_boxes[:, -1] = -gt_boxes[:, -1]
 
+                future_gt_boxes = info["annotations"]["future_gt_boxes"]
+                future_gt_boxes[:, 1] = -future_gt_boxes[:, 1]
+                future_gt_boxes[:, -1] = -future_gt_boxes[:, -1]
+
                 if "pred_boxes3d" in info["annotations"].keys():
                     pred_boxes3d = info["annotations"]["pred_boxes3d"]
                     pred_boxes3d[:, 1] = -pred_boxes3d[:, 1]
@@ -81,6 +49,7 @@ class CusTomRandomFlip3D(AugmentationBase):
                 # flip velocity_y
                 if gt_boxes.shape[1] > 7:
                     gt_boxes[:, 7] = -gt_boxes[:, 7]
+                    future_gt_boxes[:, 7] = -future_gt_boxes[:, 7]
                 for sweep in info["sweeps"]:
                     if "annotations" in sweep:
                         sgt_boxes = sweep["annotations"]["gt_boxes"]
@@ -98,6 +67,10 @@ class CusTomRandomFlip3D(AugmentationBase):
                 gt_boxes[:, 0] = -gt_boxes[:, 0]
                 gt_boxes[:, -1] = -(gt_boxes[:, -1] + np.pi)
 
+                future_gt_boxes = info["annotations"]["future_gt_boxes"]
+                future_gt_boxes[:, 0] = -future_gt_boxes[:, 0]
+                future_gt_boxes[:, -1] = -(future_gt_boxes[:, -1] + np.pi)
+
                 if "pred_boxes3d" in info["annotations"].keys():
                     pred_boxes3d = info["annotations"]["pred_boxes3d"]
                     pred_boxes3d[:, 0] = -pred_boxes3d[:, 0]
@@ -107,6 +80,7 @@ class CusTomRandomFlip3D(AugmentationBase):
                 # flip velocity_x
                 if gt_boxes.shape[1] > 7:
                     gt_boxes[:, 6] = -gt_boxes[:, 6]
+                    future_gt_boxes[:, 6] = -future_gt_boxes[:, 6]
                 for sweep in info["sweeps"]:
                     if "annotations" in sweep:
                         sgt_boxes = sweep["annotations"]["gt_boxes"]
@@ -120,7 +94,7 @@ class CusTomRandomFlip3D(AugmentationBase):
 
 
 @PROCESSORS.register()
-class CusTomGlobalRotation(AugmentationBase):
+class GlobalRotationFutureGT(AugmentationBase):
     def __init__(self, rotation):
         super().__init__()
         if not isinstance(rotation, list):
@@ -134,6 +108,12 @@ class CusTomGlobalRotation(AugmentationBase):
             target["gt_boxes"][np.newaxis, :, :3], np.array([noise_rotation])
         )[0]
         target["gt_boxes"][:, -1] += noise_rotation
+
+        if "future_gt_boxes" in target.keys():
+            target["future_gt_boxes"][:, :3] = rotate_points_along_z(
+                target["future_gt_boxes"][np.newaxis, :, :3], np.array([noise_rotation])
+            )[0]
+            target["future_gt_boxes"][:, -1] += noise_rotation
 
         if "pred_boxes3d" in target.keys():
             target["pred_boxes3d"][:, :3] = rotate_points_along_z(
@@ -163,6 +143,17 @@ class CusTomGlobalRotation(AugmentationBase):
                 np.array([noise_rotation]),
             )[0, :, :2]
 
+            if "future_gt_boxes" in target.keys():
+                target["future_gt_boxes"][:, 6:8] = rotate_points_along_z(
+                    np.hstack(
+                        [
+                            target["future_gt_boxes"][:, 6:8],
+                            np.zeros((target["future_gt_boxes"].shape[0], 1)),
+                        ]
+                    )[np.newaxis, :, :],
+                    np.array([noise_rotation]),
+                )[0, :, :2]
+
         return info
 
     def __call__(self, points, info):
@@ -179,7 +170,7 @@ class CusTomGlobalRotation(AugmentationBase):
 
 
 @PROCESSORS.register()
-class CusTomGlobalScaling(AugmentationBase):
+class GlobalScalingFutureGT(AugmentationBase):
     def __init__(self, min_scale, max_scale):
         super().__init__()
         self._init(locals())
@@ -190,6 +181,10 @@ class CusTomGlobalScaling(AugmentationBase):
         if "annotations" in info:
             gt_boxes = info["annotations"]["gt_boxes"]
             gt_boxes[:, :-1] *= noise_scale
+
+            future_gt_boxes = info["annotations"]["future_gt_boxes"]
+            future_gt_boxes[:, :-1] *= noise_scale
+
             if "pred_boxes3d" in info["annotations"].keys():
                 pred_boxes3d = info["annotations"]["pred_boxes3d"]
                 pred_boxes3d[:, :-1] *= noise_scale

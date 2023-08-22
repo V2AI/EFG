@@ -101,7 +101,7 @@ class TrajectoryFormer(nn.Module):
         self.train_nms_thresh = self.config.dataset.nms_thresh
         self.train_score_thresh = self.config.dataset.score_thresh
 
-        #eval
+        # eval
         self.max_id = 0
         self.WAYMO_TRACKING_NAMES = config.dataset.classes
         self.nms_thresh = self.config.model.nms_thresh

@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 
+
 def greedy_assignment(dist):
     matched_indices = []
     if dist.shape[1] == 0:
