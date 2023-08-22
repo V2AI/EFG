@@ -116,10 +116,27 @@ EFG is currently in a relatively preliminary stage, and we still have a lot of w
 
 # 6. Citation
 ```shell
+
+@article{chen2023trajectoryformer,
+  title={TrajectoryFormer: 3D Object Tracking Transformer with Predictive Trajectory Hypotheses},
+  author={Chen, Xuesong and Shi, Shaoshuai and Zhang, Chao and Zhu, Benjin and Wang, Qiang and Cheung, Ka Chun and See, Simon and Li, Hongsheng},
+  journal={arXiv preprint arXiv:2306.05888},
+  year={2023}
+}
+
+@inproceedings{zhu2023conquer,
+  title={Conquer: Query contrast voxel-detr for 3d object detection},
+  author={Zhu, Benjin and Wang, Zhe and Shi, Shaoshuai and Xu, Hang and Hong, Lanqing and Li, Hongsheng},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={9296--9305},
+  year={2023}
+}
+
 @misc{zhu2023efg,
     title={EFG: An Efficient, Flexible, and General deep learning framework that retains minimal},
     author={EFG Contributors},
     howpublished = {\url{https://github.com/poodarchu/efg}},
     year={2023}
 }
+
 ```

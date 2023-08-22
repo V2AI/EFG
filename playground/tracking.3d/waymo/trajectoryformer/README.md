@@ -64,11 +64,14 @@ If you want the pretrained model, please contact `chenxuesong@link.cuhk.edu.hk`.
 
 ## Citation
 ```
+
 @article{chen2023trajectoryformer,
-        title={TrajectoryFormer: 3D Object Tracking Transformer with Predictive Trajectory Hypotheses},
-        author={Chen, Xuesong and Shi, Shaoshuai and Zhang, Chao and Zhu, Benjin and Wang, Qiang and Cheung, Ka Chun and See, Simon and Li, Hongsheng},
-        journal={arXiv preprint arXiv:2306.05888},
-        year={2023}
+  title={TrajectoryFormer: 3D Object Tracking Transformer with Predictive Trajectory Hypotheses},
+  author={Chen, Xuesong and Shi, Shaoshuai and Zhang, Chao and Zhu, Benjin and Wang, Qiang and Cheung, Ka Chun and See, Simon and Li, Hongsheng},
+  journal={arXiv preprint arXiv:2306.05888},
+  year={2023}
+}
+
 
 @inproceedings{chen2022mppnet,
   title={Mppnet: Multi-frame feature intertwining with proxy points for 3d temporal object detection},
@@ -79,5 +82,4 @@ If you want the pretrained model, please contact `chenxuesong@link.cuhk.edu.hk`.
   organization={Springer}
 }
 
-}
 ```

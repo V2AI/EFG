@@ -32,11 +32,12 @@ Voxel-DETR             | Query Contrast
 ## Citation
 
 ```
-@article{zhu2022conquer,
-  title={ConQueR: Query Contrast Voxel-DETR for 3D Object Detection},
+@inproceedings{zhu2023conquer,
+  title={Conquer: Query contrast voxel-detr for 3d object detection},
   author={Zhu, Benjin and Wang, Zhe and Shi, Shaoshuai and Xu, Hang and Hong, Lanqing and Li, Hongsheng},
-  journal={arXiv preprint arXiv:2212.07289},
-  year={2022}
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={9296--9305},
+  year={2023}
 }
 ```
 
