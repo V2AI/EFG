@@ -1,7 +1,5 @@
 import numpy as np
 import copy
-import numpy as np
-
 
 def greedy_assignment(dist):
     matched_indices = []
@@ -89,14 +87,6 @@ class PubTracker(object):
         else:  # first few frame
             assert M == 0
             matched_indices = np.array([], np.int32).reshape(-1, 2)
-
-        unmatched_dets = [
-            d for d in range(dets.shape[0]) if not (d in matched_indices[:, 0])
-        ]
-
-        unmatched_tracks = [
-            d for d in range(tracks.shape[0]) if not (d in matched_indices[:, 1])
-        ]
 
         matches = matched_indices
 

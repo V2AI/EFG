@@ -8,7 +8,7 @@ from efg.geometry.box_ops import (  # mask_boxes_outside_range,; mask_boxes_outs
     mask_points_by_range,
     mask_points_by_range_bev,
     points_in_rbbox,
-    rotate_points_along_z,
+    rotate_points_along_z
 )
 
 from .augmentations import AugmentationBase
@@ -40,9 +40,7 @@ class FilterByDifficulty(AugmentationBase):
         assert "annotations" in info
         anno_dict = info["annotations"]
         if "difficulty" in anno_dict:
-            remove_mask = [
-                d in self.filter_difficulties for d in anno_dict["difficulty"]
-            ]
+            remove_mask = [d in self.filter_difficulties for d in anno_dict["difficulty"]]
             keep_mask = np.logical_not(remove_mask)
             _dict_select(anno_dict, keep_mask)
         return info
@@ -58,26 +56,14 @@ class FilterByDifficulty(AugmentationBase):
 
 @PROCESSORS.register()
 class DatabaseSampling(AugmentationBase):
-    def __init__(
-        self,
-        db_info_path,
-        sample_groups,
-        min_points=0,
-        difficulty=-1,
-        p=1.0,
-        rm_points_after_sample=False,
-    ):
+    def __init__(self, db_info_path, sample_groups, min_points=0, difficulty=-1, p=1.0, rm_points_after_sample=False):
         super().__init__()
 
         self.p = p
         self.rm_points_after_sample = rm_points_after_sample
-        self.db_sampler = self.build_database_sampler(
-            db_info_path, sample_groups, min_points, difficulty
-        )
+        self.db_sampler = self.build_database_sampler(db_info_path, sample_groups, min_points, difficulty)
 
-    def build_database_sampler(
-        self, db_info_path, sample_groups, min_points, difficulty
-    ):
+    def build_database_sampler(self, db_info_path, sample_groups, min_points, difficulty):
         db_sampler = DataBaseSampler(
             db_info_path,
             sample_groups,
@@ -97,17 +83,11 @@ class DatabaseSampling(AugmentationBase):
 
             if sampled_dict is not None:
                 for k in ["gt_names", "gt_boxes"]:
-                    info["annotations"][k] = np.concatenate(
-                        [info["annotations"][k], sampled_dict[k]], axis=0
-                    )
+                    info["annotations"][k] = np.concatenate([info["annotations"][k], sampled_dict[k]], axis=0)
                 for k in ["difficulty", "num_points_in_gt"]:
                     if k in info["annotations"]:
-                        info["annotations"][k] = np.concatenate(
-                            [info["annotations"][k], sampled_dict[k]], axis=0
-                        )
-                info["annotations"]["gt_boxes"] = np.nan_to_num(
-                    info["annotations"]["gt_boxes"]
-                )
+                        info["annotations"][k] = np.concatenate([info["annotations"][k], sampled_dict[k]], axis=0)
+                info["annotations"]["gt_boxes"] = np.nan_to_num(info["annotations"]["gt_boxes"])
 
                 if self.rm_points_after_sample:
                     sampled_gt_boxes = np.nan_to_num(sampled_dict["gt_boxes"])
@@ -122,9 +102,7 @@ class DatabaseSampling(AugmentationBase):
 
 @PROCESSORS.register()
 class DatabaseSamplingSim(DatabaseSampling):
-    def build_database_sampler(
-        self, db_info_path, sample_groups, min_points, difficulty
-    ):
+    def build_database_sampler(self, db_info_path, sample_groups, min_points, difficulty):
         db_sampler = DataBaseSampler(
             db_info_path,
             sample_groups,
@@ -210,21 +188,14 @@ class GlobalRotation(AugmentationBase):
         target["gt_boxes"][:, -1] += noise_rotation
         if target["gt_boxes"].shape[1] > 7:
             target["gt_boxes"][:, 6:8] = rotate_points_along_z(
-                np.hstack(
-                    [
-                        target["gt_boxes"][:, 6:8],
-                        np.zeros((target["gt_boxes"].shape[0], 1)),
-                    ]
-                )[np.newaxis, :, :],
+                np.hstack([target["gt_boxes"][:, 6:8], np.zeros((target["gt_boxes"].shape[0], 1))])[np.newaxis, :, :],
                 np.array([noise_rotation]),
             )[0, :, :2]
         return info
 
     def __call__(self, points, info):
         noise_rotation = np.random.uniform(self.rotation[0], self.rotation[1])
-        points = rotate_points_along_z(
-            points[np.newaxis, :, :], np.array([noise_rotation])
-        )[0]
+        points = rotate_points_along_z(points[np.newaxis, :, :], np.array([noise_rotation]))[0]
         if "annotations" in info:
             info = self._rotate_annos(info, noise_rotation)
             for sweep in info["sweeps"]:
@@ -300,9 +271,7 @@ class Voxelization(AugmentationBase):
         # [0, -40, -3, 70.4, 40, 1]
         pc_range = self.voxel_generator.point_cloud_range
         grid_size = self.voxel_generator.grid_size
-        voxels, coordinates, num_points_per_voxel = self.voxel_generator.generate(
-            points
-        )
+        voxels, coordinates, num_points_per_voxel = self.voxel_generator.generate(points)
         num_voxels = np.array([voxels.shape[0]], dtype=np.int64)
         point_voxels = dict(
             voxels=voxels,
@@ -419,9 +388,7 @@ class RandomCropPoints(AugmentationBase):
             h, w = np.array(self.pc_range[3:5]) - np.array(self.pc_range[:2])
 
             self.h, self.w = self.get_crop_size((h, w))
-            assert (
-                h >= self.h and w >= self.w
-            ), "Shape computation in {} has bugs.".format(self)
+            assert h >= self.h and w >= self.w, "Shape computation in {} has bugs.".format(self)
 
             self.x0 = np.random.randint(int(h - self.h) + 1) + self.h / 2
             self.y0 = np.random.randint(int(w - self.w) + 1) + self.w / 2
@@ -430,14 +397,10 @@ class RandomCropPoints(AugmentationBase):
 
             if "annotations" in info:
                 gt_boxes = info["annotations"]["gt_boxes"]
-                info["annotations"]["gt_boxes"] = self.apply_coords(
-                    info["annotations"]["gt_boxes"], center_offset
-                )
+                info["annotations"]["gt_boxes"] = self.apply_coords(info["annotations"]["gt_boxes"], center_offset)
                 keep = mask_boxes_outside_range_bev_z_bound(
                     info["annotations"]["gt_boxes"],
-                    np.array(
-                        [-self.h / 2, -self.w / 2, -1000, self.h / 2, self.w / 2, 1000]
-                    ),
+                    np.array([-self.h / 2, -self.w / 2, -1000, self.h / 2, self.w / 2, 1000]),
                 )
                 _dict_select(info["annotations"], keep)
 
@@ -463,16 +426,9 @@ class RandomCropPoints(AugmentationBase):
 
         return points, info
 
-    def apply_point_clouds(
-        self, points: np.ndarray, center_offset: np.ndarray
-    ) -> np.ndarray:
+    def apply_point_clouds(self, points: np.ndarray, center_offset: np.ndarray) -> np.ndarray:
         points[..., :2] -= np.array(self.pc_range[:2])
-        crop_range = [
-            self.x0 - self.h / 2,
-            self.y0 - self.w / 2,
-            self.x0 + self.h / 2,
-            self.y0 + self.w / 2,
-        ]
+        crop_range = [self.x0 - self.h / 2, self.y0 - self.w / 2, self.x0 + self.h / 2, self.y0 + self.w / 2]
         mask = (
             (points[:, 0] > crop_range[0])
             & (points[:, 0] < crop_range[2])
@@ -480,9 +436,7 @@ class RandomCropPoints(AugmentationBase):
             & (points[:, 1] < crop_range[3])
         )
         cropped_points = points[mask]
-        cropped_points[:, :2] = self.apply_coords(
-            cropped_points[:, :2] + np.array(self.pc_range[:2]), center_offset
-        )
+        cropped_points[:, :2] = self.apply_coords(cropped_points[:, :2] + np.array(self.pc_range[:2]), center_offset)
 
         return cropped_points
 

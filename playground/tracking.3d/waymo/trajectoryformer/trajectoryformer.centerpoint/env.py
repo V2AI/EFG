@@ -43,6 +43,7 @@ class CustomWDDataset(WaymoDetectionDataset):
         logger.info(f"Building data processors: {self.transforms}")
 
         self.boxes_dicts = self.load_boxes()
+        self.eval_class = config.model.eval_class
 
     def reset(self):
         random.shuffle(self.dataset_dicts)
@@ -148,13 +149,21 @@ class CustomWDDataset(WaymoDetectionDataset):
 
         if not self.is_train:
             if "centerpoint" in self.config.dataset.val_boxes_path:
-                labels = boxes_cur["pred_labels"].numpy()
-                boxes3d = boxes_cur["pred_boxes3d"].numpy()
+                labels = boxes_cur['pred_labels'].numpy()
+                if self.eval_class == 'VEHICLE':
+                    label_mask = labels == 0
+                elif self.eval_class == 'PEDESTRIAN':
+                    label_mask = labels == 1
+                elif self.eval_class == 'CYCLIST':
+                    label_mask = labels == 2
+                else:
+                    raise NotImplementedError
+                boxes3d = boxes_cur['pred_boxes3d'][label_mask].numpy()
                 boxes3d[:, -1] = -boxes3d[:, -1] - np.pi / 2
                 boxes3d = boxes3d[:, [0, 1, 2, 4, 3, 5, -1]]
-                vels_cur = boxes_cur["pred_vels"].numpy()
-                scores_cur = boxes_cur["pred_scores"].numpy()
-                labels_cur = labels + 1
+                vels_cur = boxes_cur['pred_vels'][label_mask].numpy()
+                scores_cur = boxes_cur['pred_scores'][label_mask].numpy()
+                labels_cur = labels[label_mask] + 1
             elif "mppnet" in self.config.dataset.val_boxes_path:
                 labels = boxes_cur["pred_labels"]
                 label_mask = labels >= 1

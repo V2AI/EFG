@@ -1,10 +1,6 @@
-import copy
 import torch
 import numpy as np
 from torch import nn
-from torch.nn import functional as F
-
-
 class WeightedSmoothL1Loss(nn.Module):
     """
     Code-wise Weighted Smooth L1 Loss modified based on fvcore.nn.smooth_l1_loss

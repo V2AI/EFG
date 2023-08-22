@@ -101,7 +101,7 @@ class TrajectoryFormer(nn.Module):
         self.train_nms_thresh = self.config.dataset.nms_thresh
         self.train_score_thresh = self.config.dataset.score_thresh
 
-        ### eval ###
+        #eval
         self.max_id = 0
         self.WAYMO_TRACKING_NAMES = config.dataset.classes
         self.nms_thresh = self.config.model.nms_thresh
@@ -595,8 +595,7 @@ class TrajectoryFormer(nn.Module):
     def get_trajectory_boxes_feature(self, traj_rois):
         traj_boxes = traj_rois.clone()
         batch_size = traj_rois.shape[0]
-        len_traj, num_track, num_candi = (
-            traj_rois.shape[1],
+        num_track, num_candi = (
             traj_rois.shape[2],
             traj_rois.shape[3],
         )
@@ -745,7 +744,7 @@ class TrajectoryFormer(nn.Module):
         group_det_boxes = torch.cat([group_det_boxes, time], -1)
         transfered_det = transfered_det[:, None, :, None, :]
 
-        if not aug_hypo is None:
+        if aug_hypo is not None:
             aug_hypo = aug_hypo[:, None, :, :, :]
             time = torch.zeros_like(aug_hypo[..., :1])
             aug_hypo = torch.cat([aug_hypo, time], -1)
@@ -1091,11 +1090,10 @@ class TrajectoryFormer(nn.Module):
 
     def get_pred_motion(self, traj, pred_vel=None):
         traj_rois = traj.clone().unsqueeze(3)
-        batch_size, len_traj, num_track, num_hypo = (
+        batch_size, len_traj, num_track = (
             traj_rois.shape[0],
             traj_rois.shape[1],
             traj_rois.shape[2],
-            traj_rois.shape[3],
         )
         self.num_future = 10  # pretrained motion model predict 10 future frames
         history_traj = traj_rois
@@ -1359,7 +1357,7 @@ class TrajectoryFormer(nn.Module):
 
         for index, track_id in enumerate(track_out["track_ids"]):
             track_id = track_id.item()
-            if not track_id in self.history_trajectory_bank.keys():
+            if track_id not in self.history_trajectory_bank.keys():
                 self.history_trajectory_bank[track_id]["track_scores"] = []
                 self.history_trajectory_bank[track_id]["track_vels"] = []
                 self.history_trajectory_bank[track_id]["track_labels"] = []

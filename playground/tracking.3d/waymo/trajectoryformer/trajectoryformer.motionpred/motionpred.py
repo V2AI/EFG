@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from torch import nn
 from efg.modeling.operators import nms_gpu, boxes_iou3d_gpu
-import torch.nn.functional as F
 from modules.utils import transform_trajs_to_local_coords
 from pointnet import MotionEncoder
 from losses import WeightedSmoothL1Loss
@@ -61,11 +60,10 @@ class MotionPrediction(nn.Module):
     def get_pred_traj(
         self, traj_rois, valid_mask=None, pred_vel=None, det_vel=None, pred_label=None
     ):
-        batch_size, len_traj, num_track, num_hypo = (
+        batch_size, len_traj, num_track = (
             traj_rois.shape[0],
             traj_rois.shape[1],
             traj_rois.shape[2],
-            traj_rois.shape[3],
         )
 
         history_traj = traj_rois.clone()

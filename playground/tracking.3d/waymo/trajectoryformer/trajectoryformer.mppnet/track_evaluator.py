@@ -25,6 +25,7 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
         self.root_path = self.config.detection.source.local5f.root
         self.val_path = self.config.detection.source.local5f.val
         self.metrics_path = self.config.trainer.eval_metrics_path
+        self.eval_class = self.config.model.eval_class
 
     def evaluate(self):
         if self._distributed:
@@ -43,36 +44,28 @@ class CustomWaymoTrackEvaluator(WaymoDetEvaluator):
             classes = np.array([CAT_TO_IDX[name] for name in self._classes])
 
             for target, output in zip(self._infos, self._predictions):
-                try:
-                    target["annotations"]["labels"] = np.array(
-                        [
-                            LABEL_TO_TYPE[label]
-                            for label in target["annotations"]["labels"]
-                        ]
-                    )
-                except:
-                    target["annotations"]["labels"] = np.array(
-                        [
-                            LABEL_TO_TYPE[label]
-                            for label in target["annotations"]["labels"].cpu().numpy()
-                        ]
-                    )
+                target["annotations"]["labels"] = np.array(
+                    [
+                        LABEL_TO_TYPE[label]
+                        for label in target["annotations"]["labels"]
+                    ]
+                )
+
                 target["annotations"]["gt_boxes"][:, -1] = limit_period(
                     target["annotations"]["gt_boxes"][:, -1],
                     offset=0.5,
                     period=np.pi * 2,
                 )
 
-                if self.config.eval_classes != self._classes:
-                    if self.config.eval_classes == "VEHICLE":
-                        mask = output["track_labels"] == 1
-                    elif self.config.eval_classes == "PEDESTRIAN":
-                        mask = output["track_labels"] == 2
-                    elif self.config.eval_classes == "CYCLIST":
-                        mask = output["track_labels"] == 3
-                    output["track_labels"] = output["track_labels"][mask]
-                    output["track_scores"] = output["track_scores"][mask]
-                    output["track_boxes3d"] = output["track_boxes3d"][mask]
+                if self.eval_class == "VEHICLE":
+                    mask = output["track_labels"] == 1
+                elif self.eval_class == "PEDESTRIAN":
+                    mask = output["track_labels"] == 2
+                elif self.eval_class == "CYCLIST":
+                    mask = output["track_labels"] == 3
+                output["track_labels"] = output["track_labels"][mask]
+                output["track_scores"] = output["track_scores"][mask]
+                output["track_boxes3d"] = output["track_boxes3d"][mask]
 
             processed_results = {
                 target["metadata"]["token"]: {

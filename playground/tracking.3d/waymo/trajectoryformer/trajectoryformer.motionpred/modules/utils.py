@@ -1,8 +1,5 @@
-import itertools
-import warnings
 import torch
 import numpy as np
-from typing import Any, Dict, List, Tuple, Union
 from copy import deepcopy
 
 
@@ -180,7 +177,7 @@ def transform_trajs_to_local_coords(
     box_seq_local[:, :, :, :, heading_index] = (
         box_seq_local[:, :, :, :, heading_index] - center_heading
     )
-    if not pred_vel_hypo is None:
+    if pred_vel_hypo is not None:
         local_vel_buffer = torch.zeros_like(pred_vel_hypo)
         local_vel = rotate_points_along_z(
             points=pred_vel_hypo.permute(0, 2, 3, 1, 4).reshape(
@@ -225,7 +222,7 @@ def transform_trajs_to_global_coords(
     box_seq_local[:, :, :, :, heading_index] = (
         box_seq_local[:, :, :, :, heading_index] + center_heading
     )
-    if not pred_vel_repeat is None:
+    if pred_vel_repeat is not None:
         local_vel = rotate_points_along_z(
             points=pred_vel_repeat.permute(0, 2, 3, 1, 4).reshape(
                 batch_size * num_track * num_candi, -1, pred_vel_repeat.shape[-1]
