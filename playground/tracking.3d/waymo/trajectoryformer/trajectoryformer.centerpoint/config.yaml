@@ -1,0 +1,118 @@
+detection:
+    version: 1.2.0
+    source:
+        local5f:
+            root: ${oc.env:EFG_PATH}/datasets/waymo
+            train: /infos_train_05sweeps_sampled.pkl
+            val: /infos_val_05sweeps_sampled.pkl
+
+task: train
+
+
+dataset:
+    type: CustomWDDataset
+    source: ${detection.source.local5f}
+    format: XYZIT
+    nsweeps: 5
+    max_roi_num: 128
+    traj_length: 10
+    load_interval: 1
+    classes: ["VEHICLE","PEDESTRIAN", "CYCLIST"]
+    train_boxes_path:  ${oc.env:EFG_PATH}/datasets/waymo/centerpoint_boxes_train.pkl
+    val_boxes_path:  ${oc.env:EFG_PATH}/datasets/waymo/centerpoint_boxes_val.pkl
+    score_thresh: 0
+    nms_thresh: 0.1
+    pc_range: [-75.2, -75.2, -2.0, 75.2, 75.2, 4.0]
+    voxel_size: [0.1, 0.1, 0.15]
+    motion_model:  ../trajectoryformer.motionpred/log/model_final.pth
+
+    processors:
+        train:
+            - CusTomRandomFlip3D:
+                 p: 0.5
+            - CusTomGlobalRotation:
+                 rotation: 0.78539816  # -n ~ n
+            - CusTomGlobalScaling:
+                 min_scale: 0.95
+                 max_scale: 1.05
+            - CusTomFilterByRange:
+                pc_range: ${dataset.pc_range} 
+            - PointShuffle:
+                p: 1.0
+        val:
+            - CusTomFilterByRange:
+                pc_range: ${dataset.pc_range} 
+                with_gt: False
+
+        test: ${dataset.processors.val}
+
+dataloader:
+    eval_sampler: SeqInferenceSampler
+    num_workers: 3
+    batch_size: 4 # per_gpu 
+
+model:
+
+    hidden_dim: 256
+    nhead: 4
+    enc_layers: 3
+    dim_feedforward: 1024
+    point_dim: 30
+    boxes_dim: 8
+    motion_input_dim: 6
+    motion_pred_frames: 10 # equal to pretrained motiom module
+    num_lidar_points: 128
+    dist_thresh: 2.0
+    num_hypo_pred: 1
+    num_hypo_det: 1
+    ## eval ##
+    eval_class: null
+    num_hypo_pred_eval: 5
+    history_frames_eval: 10
+    nms_thresh: 0.7
+    new_born_nms_thresh: 0.2
+    track_score: 
+        car: 0.7
+        ped: 0.6
+        cyc: 0.7
+    new_born_score: 
+        car: 0.8
+        ped: 0.72
+        cyc: 0.8
+    max_dist:
+        VEHICLE: 2
+        PEDESTRIAN: 0.5
+        CYCLIST: 1.0
+
+solver:
+    lr_scheduler:
+        type: OneCycle
+        max_epochs: 6  # will be convert to iters
+        pct_start: 0.4
+        base_momentum: 0.85
+        max_momentum: 0.95
+        div_factor: 10.0
+    optimizer:
+        type: AdamW
+        lr: 1.0e-3
+        weight_decay: 0.01
+        eps: 1.0e-9
+        betas: [0.9, 0.99]
+    grad_clipper:
+        enabled: True
+        clip_type: norm
+        params:
+            max_norm: 10
+
+
+trainer:
+    type: DefaultTrainer
+    eval_period: 1
+    checkpoint_epoch: 1 
+    log_interval: 5
+    eval_metrics_path: bazel-bin/waymo_open_dataset/metrics/tools/compute_tracking_metrics_main
+    evaluators:
+        - CustomWaymoTrackEvaluator
+
+ddp:
+    find_unused_parameters: True

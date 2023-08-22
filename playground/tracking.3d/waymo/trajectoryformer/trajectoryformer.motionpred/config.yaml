@@ -1,0 +1,83 @@
+detection:
+    version: 1.2.0
+    source:
+        local5f:
+            root: ${oc.env:EFG_PATH}/datasets/waymo
+            train: /infos_train_05sweeps_sampled.pkl
+            val: /infos_val_05sweeps_sampled.pkl
+
+task: train
+
+dataset:
+    type: CustomWDDataset
+    source: ${detection.source.local5f}
+    format: XYZIT
+    nsweeps: 0
+    future_frames: 10
+    max_roi_num: 128
+    traj_length: 20
+    load_interval: 1
+    classes: ["VEHICLE","PEDESTRIAN", "CYCLIST"]
+    train_boxes_path:  ${oc.env:EFG_PATH}/datasets/waymo/centerpoint_boxes_train.pkl
+    val_boxes_path:  ${oc.env:EFG_PATH}/datasets/waymo/centerpoint_boxes_val.pkl
+    score_thresh: 0
+    nms_thresh: 0.1
+    pc_range: [-75.2, -75.2, -2.0, 75.2, 75.2, 4.0]
+
+    processors:
+        train:
+            - RandomFlip3DFutureGT:
+                 p: 0.5
+            - GlobalRotationFutureGT:
+                 rotation: 0.78539816  # -n ~ n
+            - GlobalScalingFutureGT:
+                 min_scale: 0.95
+                 max_scale: 1.05
+        val:
+            - CusTomFilterByRange:
+                pc_range: ${dataset.pc_range} 
+                with_gt: False
+
+        test: ${dataset.processors.val}
+
+dataloader:
+    eval_sampler: SeqInferenceSampler
+    num_workers: 3
+    batch_size: 6 # per_gpu 
+
+model:
+    motion_input_dim: 6
+    hidden_dim: 256
+    dist_thresh: 2.0
+    num_hypo: 2
+
+solver:
+    lr_scheduler:
+        type: OneCycle
+        max_epochs: 36  # will be convert to iters
+        pct_start: 0.4
+        base_momentum: 0.85
+        max_momentum: 0.95
+        div_factor: 10.0
+    optimizer:
+        type: AdamW
+        lr: 1.0e-3
+        weight_decay: 0.01
+        eps: 1.0e-9
+        betas: [0.9, 0.99]
+    grad_clipper:
+        enabled: True
+        clip_type: norm
+        params:
+            max_norm: 10
+
+trainer:
+    type: DefaultTrainer
+    eval_period: 1
+    checkpoint_epoch: 1
+    log_interval: 5
+    evaluators:
+        - CustomWaymoDetEvaluator
+
+ddp:
+    find_unused_parameters: True
