@@ -41,7 +41,7 @@ git clone https://github.com/poodarchu/EFG.git
 cd EFG
 pip install -v -e .
 # set logging path to save model checkpoints, training logs, etc.
-echo "export EFG_CACHE_DIR=/path/to/your/logs/dir" > ~/.bashrc
+echo "export EFG_CACHE_DIR=/path/to/your/logs/dir" >> ~/.bashrc
 ```
 
 # 2. Data
