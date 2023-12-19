@@ -17,9 +17,9 @@ An Efficient, Flexible, and General deep learning framework that retains minimal
 # 1. Installation
 
 ## 1.1 Prerequisites
-* gcc 5 - 7
+* gcc 5 (c++11 or newer) 
 * python >= 3.6
-* cuda >= 10.2
+* cuda >= 10.1
 * pytorch >= 1.6
 
 ```shell
@@ -68,10 +68,30 @@ python cli/data_preparation/waymo/create_data.py --root-path datasets/waymo --sp
 ```
 
 ## 2.2 Data Preparation - nuScenes
+
+```
+# nuScenes
+
+dataset/nuscenes
+├── can_bus
+├── lidarseg
+├── maps
+├── occupancy
+│   ├── annotations.json
+│   └── gts
+├── panoptic
+├── samples
+├── sweeps
+├── v1.0-mini
+├── v1.0-test
+└── v1.0-trainval
+```
+
 ```shell
 # create softlink to datasets
 cd /path/to/EFG/datasets; ln -s /path/to/nuscenes/dataset/root nuscenes; cd ..
-python cli/data_preparation/nuscenes/create_data.py --root-path datasets/nuscenes --version v1.0-trainval --nsweeps 11  # 1 sample frame + 10 sweeps frame (0.5s)
+# suppose that here we use nuScenes/samples images, put gts and annotations.json under nuScenes/occupancy
+python cli/data_preparation/nuscenes/create_data.py --root-path datasets/nuscenes --version v1.0-trainval --nsweeps 11 --occ --seg
 ```
 
 # 3. Get Started

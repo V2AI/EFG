@@ -5,7 +5,7 @@ from typing import Iterator, List, Union
 import torch
 
 from efg.modeling.common.blocks import cat
-from efg.modeling.operators.rotated_boxes import pairwise_iou_rotated
+from efg.operators.rotated_boxes import pairwise_iou_rotated
 
 from .boxes import Boxes
 

@@ -2,7 +2,7 @@ import glob
 import os
 
 import torch
-from torch.utils.cpp_extension import CUDA_HOME, CppExtension, CUDAExtension
+from torch.utils.cpp_extension import CppExtension, CUDAExtension
 
 from setuptools import setup
 
@@ -15,13 +15,16 @@ def get_version():
     init_py = open(init_py_path, "r").readlines()
     version_line = [line.strip() for line in init_py if line.startswith("__version__")][0]
     version = version_line.split("=")[-1].strip().strip("'\"")
-    version = version + "_torch" + torch.__version__.replace("+", "_")
+    torch_version = torch.__version__.split(".")
+    torch_version_main = torch_version[0] + torch_version[1]
+    cuda_version_main = torch_version[-1].split("+")[1]
+    version = version + "+torch" + torch_version_main + cuda_version_main
     return version
 
 
 def get_extensions():
     this_dir = os.path.dirname(os.path.abspath(__file__))
-    extensions_dir = os.path.join(this_dir, "efg", "modeling", "operators", "src")
+    extensions_dir = os.path.join(this_dir, "efg", "operators", "src")
 
     main_source = os.path.join(extensions_dir, "vision.cpp")
     sources = glob.glob(os.path.join(extensions_dir, "**", "*.cpp"))
@@ -32,12 +35,10 @@ def get_extensions():
     sources = [main_source] + sources
     extension = CppExtension
 
-    extra_compile_args = {"cxx": ["-g", "-fopenmp"]}
+    extra_compile_args = {"cxx": ["-g", "-fopenmp", "-std=c++17"]}
     define_macros = []
 
-    if (torch.cuda.is_available() and CUDA_HOME is not None and os.path.isdir(CUDA_HOME)) or os.getenv(
-        "FORCE_CUDA", "0"
-    ) == "1":
+    if torch.cuda.is_available() or os.getenv("FORCE_CUDA", "0") == "1":
         extension = CUDAExtension
         sources += source_cuda
         define_macros += [("WITH_CUDA", None)]
@@ -47,11 +48,12 @@ def get_extensions():
             "-D__CUDA_NO_HALF_CONVERSIONS__",
             "-D__CUDA_NO_HALF2_OPERATORS__",
             "-O2",
+            "-std=c++17",
         ]
 
         # this is only required when your pytorch version <= 1.6
         # It's better if pytorch can do this by default ..
-        if torch_ver < [1, 7]:
+        if torch_ver < [1, 6]:
             CC = os.environ.get("CC", None)
             if CC is not None:
                 extra_compile_args["nvcc"].append("-ccbin={}".format(CC))

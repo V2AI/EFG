@@ -7,3 +7,9 @@ detection:
             val: /infos_val_01sweeps_sampled.pkl
             test: /infos_test_01sweeps_sampled.pkl 
             gt_database: /gt_database_train_01sweeps_withvelo_sampled_infos
+        oss1f:
+            root: s3://Datasets/Waymo
+            train: EFG01F/v${detection.version}/infos_train_01sweeps_sampled.pkl
+            val: EFG01F/v${detection.version}/infos_val_01sweeps_sampled.pkl
+            test: EFG01F/v${detection.version}/infos_test_01sweeps_sampled.pkl
+            gt_database: EFG01F/v${detection.version}/gt_database_train_01sweeps_withvelo_sampled_infos

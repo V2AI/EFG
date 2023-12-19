@@ -1,7 +1,7 @@
 import numpy as np
 from numba import jit
 
-from efg.data.augmentations3d import FilterByRange
+from efg.data.augmentations import FilterByRange
 from efg.data.registry import PROCESSORS
 
 

@@ -5,12 +5,13 @@ from copy import deepcopy
 
 import numpy as np
 
-from efg.data.augmentations import build_processors
-from efg.data.augmentations3d import _dict_select
 from efg.data.base_dataset import BaseDataset
-from efg.data.datasets.nuscenes.nusc_common import cls_attr_dist, general_to_detection, read_file, read_sweep
+from efg.data.builder import build_processors
 from efg.data.registry import DATASETS
+from efg.data.utils.misc import _dict_select
 from efg.utils.file_io import PathManager
+
+from .utils import cls_attr_dist, general_to_detection, read_file, read_sweep
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,9 @@ def drop_arrays_by_name(gt_names, used_classes):
 
 @DATASETS.register()
 class nuScenesDetectionDataset(BaseDataset):
+
+    REF_CHANNEL = "LIDAR_TOP"
+
     def __init__(self, config):
         super(nuScenesDetectionDataset, self).__init__(config)
         self.config = config
@@ -86,12 +90,12 @@ class nuScenesDetectionDataset(BaseDataset):
     def load_infos(self):
         _nusc_infos_all = pickle.load(PathManager.open(self.info_path, "rb"))
 
-        if self.is_train:  # if training
+        if self.is_train and self.config.dataset.get("cbgs", True):  # if training
             self.frac = int(len(_nusc_infos_all) * 0.25)
 
             _cls_infos = {name: [] for name in self.meta["class_names"]}
             for info in _nusc_infos_all:
-                for name in set(info["gt_names"]):
+                for name in set(info["annotations"]["gt_names"]):
                     if name in self.meta["class_names"]:
                         _cls_infos[name].append(info)
             duplicated_samples = sum([len(v) for _, v in _cls_infos.items()])
@@ -104,7 +108,7 @@ class nuScenesDetectionDataset(BaseDataset):
                 _nusc_infos += np.random.choice(cls_infos, int(len(cls_infos) * ratio)).tolist()
             _cls_infos = {name: [] for name in self.meta["class_names"]}
             for info in _nusc_infos:
-                for name in set(info["gt_names"]):
+                for name in set(info["annotations"]["gt_names"]):
                     if name in self.meta["class_names"]:
                         _cls_infos[name].append(info)
             _cls_dist = {k: len(v) / len(_nusc_infos) for k, v in _cls_infos.items()}
@@ -123,10 +127,23 @@ class nuScenesDetectionDataset(BaseDataset):
         return len(self.dataset_dicts)
 
     def __getitem__(self, idx):
-        info = deepcopy(self.dataset_dicts[idx])
 
-        if info["lidar_path"].startswith("datasets/nuscenes"):
-            lidar_path = os.path.join(os.environ["EFG_PATH"], info["lidar_path"])
+        # ['sample_token', 'ref_chan', 'RADAR_FRONT', 'RADAR_FRONT_LEFT', 'RADAR_FRONT_RIGHT', 'RADAR_BACK_LEFT',
+        # 'RADAR_BACK_RIGHT', 'LIDAR_TOP', 'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_BACK_RIGHT', 'CAM_BACK',
+        # 'CAM_BACK_LEFT', 'CAM_FRONT_LEFT', 'annotations']
+        all_info = deepcopy(self.dataset_dicts[idx])
+
+        info = {key: all_info[key] for key in ["sample_token", "annotations"]}
+        info.update(all_info["LIDAR_TOP"])
+
+        for ignore_key in ["occ_path", "panoptic", "lidarseg", "gt_names_raw"]:
+            info["annotations"].pop(ignore_key, None)
+
+        if "s3" in self.info_path:
+            lidar_path = info["data_path"].replace("datasets/nuscenes", "s3://Datasets/nuScenes")
+        elif info["data_path"].startswith("datasets/nuscenes"):
+            lidar_path = os.path.join(os.environ["EFG_PATH"], info["data_path"])
+
         points = read_file(lidar_path)
 
         # points[:, 3] /= 255
@@ -134,15 +151,17 @@ class nuScenesDetectionDataset(BaseDataset):
         sweep_times_list = [np.zeros((points.shape[0], 1))]
 
         nsweeps = self.meta["nsweeps"]
-        assert (nsweeps - 1) <= len(info["sweeps"]), "nsweeps {} should not greater than list length {}.".format(
-            nsweeps, len(info["sweeps"])
-        )
+        assert (nsweeps - 1) <= len(info["sweeps"]), \
+            f"nsweeps {nsweeps} should not greater than list length {len(info['sweeps'])}"
 
         for i in range(nsweeps - 1):
             sweep = info["sweeps"][i]
-            if sweep["lidar_path"].startswith("datasets/nuscenes"):
-                slidar_path = os.path.join(os.environ["EFG_PATH"], sweep["lidar_path"])
-            sweep["lidar_path"] = slidar_path
+
+            if "s3" in self.info_path:
+                slidar_path = sweep["data_path"].replace("datasets/nuscenes", "s3://Datasets/nuScenes")
+            elif sweep["data_path"].startswith("datasets/nuscenes"):
+                slidar_path = os.path.join(os.environ["EFG_PATH"], sweep["data_path"])
+            sweep["data_path"] = slidar_path
 
             points_sweep, times_sweep = read_sweep(sweep)
             if points_sweep is None or times_sweep is None:
@@ -168,17 +187,8 @@ class nuScenesDetectionDataset(BaseDataset):
 
         if self.is_train:
             # N x 9: [x, y, z, l, w, h, vx, vy, r]
-            mask = drop_arrays_by_name(
-                info["gt_names"],
-                [
-                    "ignore",
-                ],
-            )
-            info["annotations"] = {
-                "gt_boxes": info.pop("gt_boxes")[mask],
-                "gt_names": info.pop("gt_names")[mask],
-                "tokens": info.pop("gt_boxes_token")[mask],
-            }
+            mask = drop_arrays_by_name(info["annotations"]["gt_names"], ["ignore", "DontCare"])
+            _dict_select(info["annotations"], mask)
 
         info["root_path"] = self.root_path
 

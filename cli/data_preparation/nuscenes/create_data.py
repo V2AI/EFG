@@ -1,4 +1,6 @@
 import argparse
+import io
+import json
 import os
 import pickle
 from functools import reduce
@@ -8,11 +10,12 @@ from pyquaternion import Quaternion
 from tqdm import tqdm
 
 from nuscenes import NuScenes
+from nuscenes.can_bus.can_bus_api import NuScenesCanBus
 from nuscenes.eval.common.utils import quaternion_yaw
 from nuscenes.utils import splits
 from nuscenes.utils.geometry_utils import BoxVisibility, box_in_image, transform_matrix
 
-from efg.data.datasets.nuscenes.nusc_common import general_to_detection, read_file, read_sweep
+from efg.data.datasets.nuscenes.utils import general_to_detection, read_file, read_sweep
 from efg.geometry import box_ops
 
 
@@ -112,99 +115,194 @@ def get_sample_data(
     return data_path, box_list, cam_intrinsic
 
 
-def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, nsweeps=10):
+def _sensor_to_ref_channel(nusc: NuScenes, sensor_data_token: str, ref_data_token: str) -> dict:
+    """
+    Transform from a particular sensor coordinate frame to a reference channel.
+
+    Args:
+        :param nusc: A NuScenes instance.
+        :param sensor_data_token: The token of the input sensor data.
+        :param ref_data_token: The token of the reference sensor data.
+
+    Returns:
+        A dictionary with the following fields:
+            - "ref_from_sensor": A 4x4 transformation matrix from sensor to reference frame.
+            - "sensor_from_car": A 4x4 transformation matrix from ego car frame to sensor frame.
+            - "car_from_global": A 4x4 transformation matrix from global frame to ego car frame.
+    """
+
+    # sensor -> ego -> global -> ego' -> ref
+
+    # reference sensor data
+    ref_sd_record = nusc.get("sample_data", ref_data_token)
+    ref_data_path = nusc.get_sample_data_path(ref_data_token)
+    ref_time = 1e-6 * ref_sd_record["timestamp"]
+
+    # Homogeneous transform from ego car frame to reference frame
+    # calibrated_sensor: sensor w.r.t. ego car
+    ref_cs_record = nusc.get("calibrated_sensor", ref_sd_record["calibrated_sensor_token"])
+    ref_from_car = transform_matrix(ref_cs_record["translation"], Quaternion(ref_cs_record["rotation"]), inverse=True)
+    # Homogeneous transformation matrix from global to _current_ ego car frame
+    # ego_pose: ego car w.r.t. global
+    ref_pose_record = nusc.get("ego_pose", ref_sd_record["ego_pose_token"])
+    car_from_global = transform_matrix(
+        ref_pose_record["translation"], Quaternion(ref_pose_record["rotation"]), inverse=True
+    )
+
+    if sensor_data_token != ref_data_token:
+        # current sensor data
+        sd_record = nusc.get("sample_data", sensor_data_token)
+
+        # Homogeneous transformation matrix from global
+        pose_record = nusc.get("ego_pose", sd_record["ego_pose_token"])
+        # ego pose
+        global_from_car = transform_matrix(
+            pose_record["translation"], Quaternion(pose_record["rotation"]), inverse=False
+        )
+
+        # Homogeneous transformation matrix from ego car frame to sensor frame
+        cs_record = nusc.get("calibrated_sensor", sd_record["calibrated_sensor_token"])
+        # camera extrinsic
+        car_from_current = transform_matrix(cs_record["translation"], Quaternion(cs_record["rotation"]), inverse=False)
+
+        ref_from_current = reduce(np.dot, [ref_from_car, car_from_global, global_from_car, car_from_current])
+        sensor_data_path = nusc.get_sample_data_path(sd_record["token"])
+        time_lag = ref_time - 1e-6 * sd_record["timestamp"]
+
+        sensor_info = {
+            "sd_token": sensor_data_token,
+            "data_path": sensor_data_path,
+            "modality": sd_record["sensor_modality"],
+            "transform_matrix": ref_from_current,
+            "time_lag": time_lag,
+            "timestamp": 1e-6 * sd_record["timestamp"],
+            "global_from_car": global_from_car,
+            "car_from_current": car_from_current,
+        }
+
+        if sd_record["sensor_modality"] == "camera":
+            cam_intrinsic = np.array(cs_record["camera_intrinsic"])
+            sensor_info["cam_intrinsic"] = cam_intrinsic
+            sensor_info["im_width"] = sd_record["width"]
+            sensor_info["im_height"] = sd_record["height"]
+
+        return sensor_info
+    else:
+        return {
+            "sd_token": ref_data_token,
+            "data_path": ref_data_path,
+            "modality": ref_sd_record["sensor_modality"],
+            "transform_matrix": np.eye(4),
+            "time_lag": 0,
+            "timestamp": ref_time,
+            "ref_from_car": ref_from_car,
+            "car_from_global": car_from_global,
+        }
+
+
+def _get_can_bus_info(nusc, nusc_can_bus, sample):
+    scene_name = nusc.get("scene", sample["scene_token"])["name"]
+    sample_timestamp = sample["timestamp"]
+    try:
+        pose_list = nusc_can_bus.get_messages(scene_name, "pose")
+    except:
+        return np.zeros(18)  # server scenes do not have can bus information.
+    can_bus = []
+    # during each scene, the first timestamp of can_bus may be large than the first sample's timestamp
+    last_pose = pose_list[0]
+    for i, pose in enumerate(pose_list):
+        if pose["utime"] > sample_timestamp:
+            break
+        last_pose = pose
+    _ = last_pose.pop("utime")  # useless
+    pos = last_pose.pop("pos")
+    rotation = last_pose.pop("orientation")
+    can_bus.extend(pos)
+    can_bus.extend(rotation)
+    for key in last_pose.keys():
+        can_bus.extend(pose[key])  # 16 elements
+    can_bus.extend([0.0, 0.0])
+    return np.array(can_bus)
+
+
+def _fill_trainval_infos(
+    nusc, nusc_canbus, train_scenes, val_scenes, test=False, nsweeps=10, ref_chan="LIDAR_TOP", occ=False, seg=False
+):
+    """
+    Generate the info file for training and validation. Here we store data from all modalities in LIDAR_TOP coordinate.
+
+    Args:
+        nusc: A NuScenes instance.
+        train_scenes: Scenes for training.
+        val_scenes: Scenes for validation.
+        test: Whether to generate infos for test set.
+        nsweeps: Number of sweeps for lidar.
+        ref_chan: The reference channel of the dataset, e.g. 'LIDAR_TOP'.
+
+    Returns:
+        train_nusc_infos: Info for training set.
+        val_nusc_infos: Info for validation set.
+    """
+
     train_nusc_infos = []
     val_nusc_infos = []
 
-    ref_chan = "LIDAR_TOP"  # The reference channel of the current sample_rec that the point clouds are mapped to.
-    chan = "LIDAR_TOP"  # The current channel.
+    root_path = nusc.dataroot
+
+    if occ:
+        occ_annotations = json.load(open(os.path.join(root_path, "occupancy", "annotations.json"), "r"))["scene_infos"]
+        occ_annotations["occ_path"] = os.path.join(root_path, "occupancy")
+    else:
+        occ_annotations = None
 
     for sample in tqdm(nusc.sample):
-        """Manual save info["sweeps"]"""
-        # Get reference pose and timestamp
-        # ref_chan == "LIDAR_TOP"
-        ref_sd_token = sample["data"][ref_chan]
-        ref_sd_rec = nusc.get("sample_data", ref_sd_token)
-        ref_cs_rec = nusc.get("calibrated_sensor", ref_sd_rec["calibrated_sensor_token"])
-        ref_pose_rec = nusc.get("ego_pose", ref_sd_rec["ego_pose_token"])
-        ref_time = 1e-6 * ref_sd_rec["timestamp"]
-
-        ref_lidar_path, ref_boxes, _ = get_sample_data(nusc, ref_sd_token)
-
-        ref_cam_front_token = sample["data"]["CAM_FRONT"]
-        ref_cam_path, _, ref_cam_intrinsic = nusc.get_sample_data(ref_cam_front_token)
-
-        # Homogeneous transform from ego car frame to reference frame
-        ref_from_car = transform_matrix(ref_cs_rec["translation"], Quaternion(ref_cs_rec["rotation"]), inverse=True)
-        # Homogeneous transformation matrix from global to _current_ ego car frame
-        car_from_global = transform_matrix(
-            ref_pose_rec["translation"], Quaternion(ref_pose_rec["rotation"]), inverse=True
-        )
 
         info = {
-            "lidar_path": ref_lidar_path,
-            "cam_front_path": ref_cam_path,
-            "cam_intrinsic": ref_cam_intrinsic,
-            "token": sample["token"],
-            "sweeps": [],
-            "ref_from_car": ref_from_car,
-            "car_from_global": car_from_global,
-            "timestamp": ref_time,
+            "prev": sample["prev"],
+            "next": sample["next"],
+            "timestamp": 1e-6 * sample["timestamp"],
+            "sample_token": sample["token"],
+            "scene_token": nusc.get("sample", sample["token"])["scene_token"],
+            "ref_chan": ref_chan,
         }
+        info["map_location"] = nusc.get("log", nusc.get("scene", info["scene_token"])["log_token"])["location"]
 
-        sample_data_token = sample["data"][chan]
-        curr_sd_rec = nusc.get("sample_data", sample_data_token)
-        sweeps = []
-        while len(sweeps) < nsweeps - 1:
-            if curr_sd_rec["prev"] == "":
-                if len(sweeps) == 0:
-                    sweep = {
-                        "lidar_path": ref_lidar_path,
-                        "sample_data_token": curr_sd_rec["token"],
-                        "transform_matrix": None,
-                        "time_lag": curr_sd_rec["timestamp"] * 0,
-                    }
-                    sweeps.append(sweep)
-                else:
-                    sweeps.append(sweeps[-1])
+        can_bus = _get_can_bus_info(nusc, nusc_canbus, sample)
+        info["CAN_BUS"] = can_bus
+
+        for channel, token in sample["data"].items():
+            sd_record = nusc.get("sample_data", token)
+            sensor_modality = sd_record["sensor_modality"]
+            if sensor_modality == "camera":
+                info[channel] = {}
+                info[channel].update(_sensor_to_ref_channel(nusc, token, sample["data"][ref_chan]))
+            elif sensor_modality == "lidar":
+                info[channel] = {}
+                info[channel].update(_sensor_to_ref_channel(nusc, token, sample["data"][ref_chan]))
+                # Aggregate current and previous sweeps.
+                current_sd_rec = nusc.get("sample_data", token)
+                sweeps = []
+                while len(sweeps) < nsweeps - 1:
+                    if current_sd_rec["prev"] == "":
+                        if len(sweeps) == 0:
+                            sweeps.append(_sensor_to_ref_channel(nusc, token, sample["data"][ref_chan]))
+                        else:
+                            sweeps.append(sweeps[-1])
+                    else:
+                        token = current_sd_rec["prev"]
+                        current_sd_rec = nusc.get("sample_data", token)
+                        sweeps.append(_sensor_to_ref_channel(nusc, token, sample["data"][ref_chan]))
+                info[channel]["sweeps"] = sweeps
+                assert len(info[channel]["sweeps"]) == nsweeps - 1, \
+                    f"sweep {current_sd_rec['token']} has {len(info[channel]['sweeps'])} sweeps, expect #{nsweeps-1}."
+
             else:
-                curr_sd_rec = nusc.get("sample_data", curr_sd_rec["prev"])
-
-                # Get past pose
-                current_pose_rec = nusc.get("ego_pose", curr_sd_rec["ego_pose_token"])
-                global_from_car = transform_matrix(
-                    current_pose_rec["translation"], Quaternion(current_pose_rec["rotation"]), inverse=False
-                )
-
-                # Homogeneous transformation matrix from sensor coordinate frame to ego car frame.
-                current_cs_rec = nusc.get("calibrated_sensor", curr_sd_rec["calibrated_sensor_token"])
-                car_from_current = transform_matrix(
-                    current_cs_rec["translation"], Quaternion(current_cs_rec["rotation"]), inverse=False
-                )
-
-                tm = reduce(np.dot, [ref_from_car, car_from_global, global_from_car, car_from_current])
-
-                lidar_path = nusc.get_sample_data_path(curr_sd_rec["token"])
-
-                time_lag = ref_time - 1e-6 * curr_sd_rec["timestamp"]
-
-                sweep = {
-                    "lidar_path": lidar_path,
-                    "sample_data_token": curr_sd_rec["token"],
-                    "transform_matrix": tm,
-                    "global_from_car": global_from_car,
-                    "car_from_current": car_from_current,
-                    "time_lag": time_lag,
-                }
-                sweeps.append(sweep)
-
-        info["sweeps"] = sweeps
-
-        assert (
-            len(info["sweeps"]) == nsweeps - 1
-        ), f"sweep {curr_sd_rec['token']} has {len(info['sweeps'])} sweeps, please repeat to num {nsweeps-1}."
+                info[channel] = {}
+                info[channel].update(_sensor_to_ref_channel(nusc, token, sample["data"][ref_chan]))
 
         if not test:
+
+            _, ref_boxes, _ = get_sample_data(nusc, sample["data"][ref_chan])
             annotations = [nusc.get("sample_annotation", token) for token in sample["anns"]]
 
             # convert from nuScenes Lidar to waymo Lidar
@@ -221,15 +319,29 @@ def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, nsweeps=10)
             gt_boxes = np.nan_to_num(np.concatenate([locs, dims, velocity[:, :2], rots], axis=1))
 
             mask = np.array(
-                [(anno["num_lidar_pts"] + anno["num_radar_pts"]) > 0 for anno in annotations],
-                dtype=bool,
+                [(anno["num_lidar_pts"] + anno["num_radar_pts"]) > 0 for anno in annotations], dtype=bool
             ).reshape(-1)
 
-            info["gt_boxes"] = gt_boxes[mask].astype(np.float32)
-            info["gt_names"] = np.array([general_to_detection[name] for name in names])[mask]
-            info["gt_boxes_token"] = tokens[mask]
+            info["annotations"] = {}
+            info["annotations"]["gt_boxes"] = gt_boxes[mask].astype(np.float32)
+            info["annotations"]["gt_box_tokens"] = tokens[mask]
+            info["annotations"]["gt_names"] = np.array([general_to_detection[name] for name in names])[mask]
+            info["annotations"]["gt_names_raw"] = np.array(names)[mask]
 
             assert len(annotations) == len(gt_boxes) == len(velocity)
+
+        # occupancy
+        if occ:
+            scene_name = nusc.get("scene", sample["scene_token"])["name"]
+            sample_occ = occ_annotations[scene_name][sample["token"]]
+            info["annotations"]["occ_path"] = os.path.join(occ_annotations["occ_path"], sample_occ["gt_path"])
+
+        if seg:
+            # lidar-seg
+            lidar_seg = nusc.get("lidarseg", sample["data"]["LIDAR_TOP"])
+            panoptic = nusc.get("panoptic", sample["data"]["LIDAR_TOP"])
+            info["annotations"]["lidarseg"] = lidar_seg
+            info["annotations"]["panoptic"] = panoptic
 
         if sample["scene_token"] in train_scenes:
             train_nusc_infos.append(info)
@@ -239,11 +351,9 @@ def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, nsweeps=10)
     return train_nusc_infos, val_nusc_infos
 
 
-def create_nuscenes_infos(root_path, version="v1.0-trainval", nsweeps=10):
-    nusc = NuScenes(version=version, dataroot=root_path, verbose=True)
+def create_nuscenes_infos(root_path, version="v1.0-trainval", nsweeps=10, occ=False, seg=False, client=None, nproc=8):
 
     assert version in ["v1.0-trainval", "v1.0-test", "v1.0-mini"]
-
     if version == "v1.0-trainval":
         train_scenes = splits.train
         val_scenes = splits.val
@@ -255,8 +365,11 @@ def create_nuscenes_infos(root_path, version="v1.0-trainval", nsweeps=10):
         val_scenes = splits.mini_val
     else:
         raise ValueError("unknown")
-
     test = "test" in version
+
+    nusc = NuScenes(version=version, dataroot=root_path, verbose=True)
+    nusc_canbus = NuScenesCanBus(dataroot=root_path)
+
     # filter exist scenes. you may only download part of dataset.
     available_scenes = _get_available_scenes(nusc)
     available_scene_names = [s["name"] for s in available_scenes]
@@ -271,48 +384,76 @@ def create_nuscenes_infos(root_path, version="v1.0-trainval", nsweeps=10):
     else:
         print(f"train scene: {len(train_scenes)}, val scene: {len(val_scenes)}")
 
-    train_nusc_infos, val_nusc_infos = _fill_trainval_infos(nusc, train_scenes, val_scenes, test, nsweeps=nsweeps)
+    train_nusc_infos, val_nusc_infos = _fill_trainval_infos(
+        nusc, nusc_canbus, train_scenes, val_scenes, test, nsweeps=nsweeps, ref_chan="LIDAR_TOP", occ=occ, seg=seg,
+    )
 
-    if test:
-        print(f"test sample: {len(train_nusc_infos)}")
-        with open(os.path.join(root_path, f"infos_test_{nsweeps:02d}sweeps_withvelo_new.pkl"), "wb") as f:
-            pickle.dump(train_nusc_infos, f)
+    if "s3" not in root_path:
+        if test:
+            print(f"test sample: {len(train_nusc_infos)}")
+            with open(os.path.join(root_path, f"infos_test_{nsweeps:02d}sweeps_with_cam_reorg.pkl"), "wb") as f:
+                pickle.dump(train_nusc_infos, f)
+        else:
+            print(f"train sample: {len(train_nusc_infos)}, val sample: {len(val_nusc_infos)}")
+            with open(os.path.join(root_path, f"infos_train_{nsweeps:02d}sweeps_with_cam_reorg.pkl"), "wb") as f:
+                pickle.dump(train_nusc_infos, f)
+            with open(os.path.join(root_path, f"infos_val_{nsweeps:02d}sweeps_with_cam_reorg.pkl"), "wb") as f:
+                pickle.dump(val_nusc_infos, f)
     else:
-        print(f"train sample: {len(train_nusc_infos)}, val sample: {len(val_nusc_infos)}")
-        with open(os.path.join(root_path, f"infos_train_{nsweeps:02d}sweeps_withvelo_new.pkl"), "wb") as f:
-            pickle.dump(train_nusc_infos, f)
-        with open(os.path.join(root_path, f"infos_val_{nsweeps:02d}sweeps_withvelo_new.pkl"), "wb") as f:
-            pickle.dump(val_nusc_infos, f)
+        if test:
+            print(f"test sample: {len(train_nusc_infos)}")
+            client.put(
+                root_path.replace("nuScenes", f"nuScenesEFG{args.nsweeps:02d}F")
+                + f"/infos_test_{nsweeps:02d}sweeps_with_cam_reorg.pkl",
+                pickle.dumps(train_nusc_infos),
+            )
+        else:
+            print(f"train sample: {len(train_nusc_infos)}, val sample: {len(val_nusc_infos)}")
+            client.put(
+                root_path.replace("nuScenes", f"nuScenesEFG{args.nsweeps:02d}F")
+                + f"/infos_train_{nsweeps:02d}sweeps_with_cam_reorg.pkl",
+                pickle.dumps(train_nusc_infos),
+            )
+            client.put(
+                root_path.replace("nuScenes", f"nuScenesEFG{args.nsweeps:02d}F")
+                + f"/infos_val_{nsweeps:02d}sweeps_with_cam_reorg.pkl",
+                pickle.dumps(val_nusc_infos),
+            )
 
 
 def create_groundtruth_database(
     data_path,
     info_path=None,
     used_classes=(
-        "car",
-        "truck",
-        "construction_vehicle",
-        "bus",
-        "trailer",
-        "barrier",
-        "motorcycle",
-        "bicycle",
-        "pedestrian",
-        "traffic_cone",
+        "car", "truck", "construction_vehicle", "bus", "trailer",
+        "barrier", "motorcycle", "bicycle", "pedestrian", "traffic_cone",
     ),
     db_path=None,
     dbinfo_path=None,
     relative_path=True,
     nsweeps=1,
+    client=None,
 ):
     root_path = data_path
 
-    if db_path is None:
-        db_path = os.path.join(root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_new")
-    if dbinfo_path is None:
-        dbinfo_path = os.path.join(root_path, f"gt_database_train_{nsweeps:02d}sweeps_withvelo_new_infos.pkl")
-    if not os.path.exists(db_path):
-        os.makedirs(db_path)
+    if "s3" not in root_path:
+        if db_path is None:
+            db_path = os.path.join(root_path, f"gt_database_train_{nsweeps:02d}sweeps_with_cam_reorg")
+        if dbinfo_path is None:
+            dbinfo_path = os.path.join(root_path, f"gt_database_train_{nsweeps:02d}sweeps_with_cam_reorg_infos.pkl")
+        if not os.path.exists(db_path):
+            os.makedirs(db_path)
+    else:
+        if db_path is None:
+            db_path = (
+                root_path.replace("nuScenes", f"nuScenesEFG{nsweeps:02d}F")
+                + f"/gt_database_train_{nsweeps:02d}sweeps_with_cam_reorg"
+            )
+        if dbinfo_path is None:
+            dbinfo_path = (
+                root_path.replace("nuScenes", f"nuScenesEFG{nsweeps:02d}F")
+                + f"/gt_database_train_{nsweeps:02d}sweeps_with_cam_reorg_infos.pkl"
+            )
 
     # nuscenes dataset setting
     point_features = 5
@@ -320,24 +461,32 @@ def create_groundtruth_database(
     all_db_infos = {}
     group_counter = 0
 
-    with open(info_path, "rb") as f:
-        dataset_infos_all = pickle.load(f)
+    if "s3" not in root_path:
+        with open(info_path, "rb") as f:
+            dataset_infos_all = pickle.load(f)
+    else:
+        info_pkl_bytes = client.get(info_path)
+        dataset_infos_all = pickle.load(io.BytesIO(info_pkl_bytes))
 
+    ref_chan = "LIDAR_TOP"
     for info in tqdm(dataset_infos_all):
-        lidar_path = info["lidar_path"]
+        info_lidar = info[ref_chan]
+        lidar_path = info_lidar["data_path"]
+        if "s3" in root_path:
+            lidar_path = lidar_path.replace("datasets/nuscenes", "s3://Datasets/nuScenes")
 
-        points = read_file(str(lidar_path))
+        points = read_file(lidar_path)
 
         # points[:, 3] /= 255
         sweep_points_list = [points]
         sweep_times_list = [np.zeros((points.shape[0], 1))]
 
-        assert (nsweeps - 1) <= len(info["sweeps"]), "nsweeps {} should not greater than list length {}.".format(
-            nsweeps, len(info["sweeps"])
+        assert (nsweeps - 1) <= len(info_lidar["sweeps"]), "nsweeps {} should not greater than list length {}.".format(
+            nsweeps, len(info_lidar["sweeps"])
         )
 
         for i in range(nsweeps - 1):
-            points_sweep, times_sweep = read_sweep(info["sweeps"][i])
+            points_sweep, times_sweep = read_sweep(info_lidar["sweeps"][i])
             if points_sweep is None or times_sweep is None:
                 continue
             sweep_points_list.append(points_sweep)
@@ -351,9 +500,9 @@ def create_groundtruth_database(
         points[:, 1] *= -1
 
         annos = {
-            "boxes": info["gt_boxes"],
-            "names": info["gt_names"],
-            "tokens": info["gt_boxes_token"],
+            "boxes": info["annotations"]["gt_boxes"],
+            "names": info["annotations"]["gt_names"],
+            "tokens": info["annotations"]["gt_box_tokens"],
         }
 
         gt_boxes = annos["boxes"]
@@ -383,22 +532,28 @@ def create_groundtruth_database(
                 gt_points = points[point_indices[:, i]]
                 gt_points[:, :3] -= gt_boxes[i, :3]
 
-                filename = f"{info['token']}_{names[i]}_{i}.bin"
+                filename = f"{info_lidar['sd_token']}_{names[i]}_{i}.bin"
+                if "s3" not in db_path:
+                    dirpath = os.path.join(db_path, names[i])
 
-                dirpath = os.path.join(db_path, names[i])
-                if not os.path.exists(dirpath):
-                    os.makedirs(dirpath)
-                filepath = os.path.join(db_path, names[i], filename)
-                with open(filepath, "w") as f:
-                    try:
-                        gt_points[:, :point_features].tofile(f)
-                    except:
-                        print("process {} files".format(info["token"]))
-                        break
+                    if not os.path.exists(dirpath):
+                        os.makedirs(dirpath)
+
+                    filepath = os.path.join(db_path, names[i], filename)
+
+                    with open(filepath, "w") as f:
+                        try:
+                            gt_points[:, :point_features].tofile(f)
+                        except:
+                            print("process {} files".format(info_lidar["sd_token"]))
+                            break
+                else:
+                    filepath = db_path + "/" + names[i] + "/" + filename
+                    client.put(filepath, pickle.dumps(gt_points[:, :point_features]))
 
                 if relative_path:
                     db_dump_path = os.path.join(
-                        f"gt_database_train_{nsweeps:02d}sweeps_withvelo_new", names[i], filename
+                        f"gt_database_train_{nsweeps:02d}sweeps_with_cam_reorg", names[i], filename
                     )
                 else:
                     db_dump_path = filepath
@@ -406,7 +561,7 @@ def create_groundtruth_database(
                 db_info = {
                     "name": names[i],
                     "path": db_dump_path,
-                    "token": info["token"],
+                    "sd_token": info_lidar["sd_token"],
                     "gt_idx": i,
                     "box3d_lidar": gt_boxes[i],
                     "num_points_in_gt": gt_points.shape[0],
@@ -431,8 +586,11 @@ def create_groundtruth_database(
     for k, v in all_db_infos.items():
         print(f"load {len(v)} {k} database infos")
 
-    with open(dbinfo_path, "wb") as f:
-        pickle.dump(all_db_infos, f)
+    if "s3" not in dbinfo_path:
+        with open(dbinfo_path, "wb") as f:
+            pickle.dump(all_db_infos, f)
+    else:
+        client.put(dbinfo_path, pickle.dumps(all_db_infos))
 
 
 if __name__ == "__main__":
@@ -440,12 +598,27 @@ if __name__ == "__main__":
     parser.add_argument("--root-path", default=None)
     parser.add_argument("--version", default="v1.0-trainval")
     parser.add_argument("--nsweeps", default=1, type=int)
+    parser.add_argument("--occ", action="store_true")
+    parser.add_argument("--seg", action="store_true")
 
     args = parser.parse_args()
 
-    create_nuscenes_infos(args.root_path, args.version, args.nsweeps)
+    if "s3" in args.root_path:
+        from petrel_client.client import Client
 
-    info_path = os.path.join(args.root_path, f"infos_train_{args.nsweeps:02d}sweeps_withvelo_new.pkl")
+        client = Client("~/.petreloss.conf")
+    else:
+        client = None
+
+    create_nuscenes_infos(args.root_path, args.version, args.nsweeps, args.occ, args.seg, client)
+
+    if "s3" not in args.root_path:
+        info_path = os.path.join(args.root_path, f"infos_train_{args.nsweeps:02d}sweeps_with_cam_reorg.pkl")
+    else:
+        info_path = (
+            args.root_path.replace("nuScenes", f"nuScenesEFG{args.nsweeps:02d}F")
+            + f"/infos_train_{args.nsweeps:02d}sweeps_with_cam_reorg.pkl"
+        )
 
     if args.version == "v1.0-trainval":
-        create_groundtruth_database(args.root_path, info_path=info_path, nsweeps=args.nsweeps)
+        create_groundtruth_database(args.root_path, info_path=info_path, nsweeps=args.nsweeps, client=client)

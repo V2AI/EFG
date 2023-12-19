@@ -203,7 +203,11 @@ class BitMasks:
         """
         # TODO Make this method faster
         boxes = torch.zeros(len(self.tensor), 4, dtype=torch.float32)
-        shift_y, shift_x = torch.meshgrid(torch.arange(self.tensor.shape[-2]), torch.arange(self.tensor.shape[-1]))
+        shift_y, shift_x = torch.meshgrid(
+            torch.arange(self.tensor.shape[-2]),
+            torch.arange(self.tensor.shape[-1]),
+            indexing="ij",
+        )
         for idx in range(len(self.tensor)):
             bitmask = self.tensor[idx]
             if bitmask.sum() == 0:

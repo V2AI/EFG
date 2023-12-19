@@ -5,17 +5,28 @@ detection:
     source:
         local11f:
             root: ${oc.env:EFG_PATH}/datasets/nuscenes
-            train: /infos_train_11sweeps_withvelo_new.pkl
-            val: /infos_val_11sweeps_withvelo_new.pkl
+            train: /infos_train_11sweeps_with_cam_reorg.pkl
+            val: /infos_val_11sweeps_with_cam_reorg.pkl
             test: ${detection.source.local11f.val}
-            gt_database: /gt_database_train_11sweeps_withvelo_new_infos
-
+            gt_database: /gt_database_train_11sweeps_with_cam_reorg_infos
+        local11f_debug:
+            root: ${oc.env:EFG_PATH}/datasets/nuscenes
+            train: /infos_train_11sweeps_with_cam_reorg_debug.pkl
+            val: /infos_val_11sweeps_with_cam_reorg.pkl
+            test: ${detection.source.local11f.val}
+            gt_database: /gt_database_train_11sweeps_with_cam_reorg_infos
+        oss11f:
+            root: s3://Datasets/nuScenes
+            train: EFG11F/v${detection.major_version}/infos_train_11sweeps_with_cam_reorg.pkl
+            val: EFG11F/v${detection.major_version}/infos_val_11sweeps_with_cam_reorg.pkl
+            test: ${detection.source.oss11f.val}
+            gt_database: EFG11F/v${detection.major_version}/gt_database_train_11sweeps_with_cam_reorg_infos
 
 cvpr23occ:
     version: v1.0-trainval
     source: 
         local11f:
-            root: ${oc.env:EFG_PATH}/datasets/nuscenes_cvpr23occ
-            train: /cvpr23_occ_infos_temporal_train.pkl
-            val: /cvpr23_occ_infos_temporal_val.pkl 
+            root: ${oc.env:EFG_PATH}/datasets/nuscenes
+            train: /infos_train_11sweeps_with_cam_reorg.pkl
+            val: /infos_val_11sweeps_with_cam_reorg.pkl 
             test: ${cvpr23occ.source.local11f.val}

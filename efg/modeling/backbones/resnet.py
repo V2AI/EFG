@@ -10,7 +10,7 @@ from efg.data.structures.shape_spec import ShapeSpec
 from efg.modeling.common import weight_init
 from efg.modeling.common.batch_norm import FrozenBatchNorm2d, get_activation, get_norm
 from efg.modeling.common.blocks import Conv2d
-from efg.modeling.operators.deform_conv import DeformConv, ModulatedDeformConv
+from efg.operators.deform_conv import DeformConv, ModulatedDeformConv
 
 from .backbone import Backbone
 

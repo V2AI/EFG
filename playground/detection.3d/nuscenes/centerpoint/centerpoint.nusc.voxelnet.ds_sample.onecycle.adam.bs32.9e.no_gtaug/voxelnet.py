@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from efg.data.augmentations3d import _dict_select
+from efg.data.utils.misc import _dict_select
 from efg.geometry.box_ops_torch import limit_period
 from efg.modeling.backbones.configurable_rpn import RPN
 from efg.modeling.backbones.sparse_net import SpMiddleResNetFHD

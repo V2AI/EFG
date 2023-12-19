@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 from torch.utils.data import Dataset
 
 from efg.utils.file_io import PathManager
@@ -59,17 +57,7 @@ class BaseDataset(Dataset):
             TransformList: contain the transforms that's used.
         """
 
-        if isinstance(self.transforms, dict):
-            dataset_dict = {}
-            for key, tfms in self.transforms.items():
-                img = deepcopy(image)
-                annos = deepcopy(annotations)
-                for tfm in tfms:
-                    img, annos = tfm(img, annos, **kwargs)
-                dataset_dict[key] = (img, annos)
-            return dataset_dict, None
-        else:
-            for tfm in self.transforms:
-                image, annotations = tfm(image, annotations, **kwargs)
+        for tfm in self.transforms:
+            image, annotations = tfm(image, annotations, **kwargs)
 
-            return image, annotations
+        return image, annotations
