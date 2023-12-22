@@ -3,7 +3,7 @@ import json
 import os
 from ast import literal_eval
 
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 import torch
 
@@ -11,7 +11,7 @@ import torch
 def load_yaml(file_path):
     mapping = OmegaConf.load(file_path)
 
-    includes = mapping.get("includes", [])
+    includes = mapping.pop("includes", [])
     include_mapping = OmegaConf.create()
 
     for include in includes:
@@ -19,8 +19,14 @@ def load_yaml(file_path):
         current_include_mapping = load_yaml(include)
         include_mapping = OmegaConf.merge(include_mapping, current_include_mapping)
 
-    mapping.pop("includes", None)
+    # Merge the include_mapping with the main mapping
     mapping = OmegaConf.merge(include_mapping, mapping)
+    mapping = OmegaConf.create(OmegaConf.to_container(mapping, resolve=True))
+
+    # List of known keys to remove from the merged configuration
+    for key in include_mapping.keys():
+        if key in mapping:
+            del mapping[key]
 
     return mapping
 

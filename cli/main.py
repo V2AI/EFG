@@ -1,11 +1,9 @@
 import argparse
-import json
 import os
 import sys
 from os.path import dirname
 
-from easydict import EasyDict as edict
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, ListConfig
 
 import torch
 
@@ -19,6 +17,39 @@ from efg.utils import distributed as comm
 from efg.utils.collect_env import collect_env_info
 from efg.utils.file_io import PathManager
 from efg.utils.logger import setup_logger
+
+
+def format_dict_config(dc, indent=0):
+    GREEN = '\033[92m'  # ANSI escape sequence for green
+    YELLOW = '\033[93m'  # ANSI escape sequence for yellow
+    END = '\033[0m'  # ANSI escape sequence to reset color
+
+    formatted_str = ""
+    if isinstance(dc, DictConfig):
+        for key, value in dc.items():
+            indent_str = '' if indent == 0 else (" " * (4 * (indent - 1)) + "|-- ")
+            formatted_str += indent_str + GREEN + str(key) + END + ": "
+            if isinstance(value, ListConfig):
+                is_complex_list = any(isinstance(item, DictConfig) for item in value)
+                if is_complex_list:
+                    formatted_str += "\n"
+                    for item in value:
+                        if isinstance(item, DictConfig):
+                            formatted_str += format_dict_config(item, indent + 1)
+                        else:
+                            list_indent_str = " " * (4 * indent) + "|-- "
+                            formatted_str += list_indent_str + YELLOW + str(item) + END + "\n"
+                else:
+                    formatted_str += YELLOW + "[" + ", ".join(map(str, value)) + "]" + END + "\n"
+            elif isinstance(value, list):
+                formatted_str += YELLOW + "[" + ", ".join(map(str, value)) + "]" + END + "\n"
+            elif isinstance(value, DictConfig):
+                formatted_str += "\n" + format_dict_config(value, indent + 1)
+            else:
+                formatted_str += YELLOW + str(value) + END + "\n"
+    else:
+        formatted_str += YELLOW + str(dc) + END + "\n"
+    return formatted_str
 
 
 def get_parser():
@@ -57,7 +88,7 @@ def link_log(output_dir, link_name="log"):
 
 def worker(args):
     configuration = Configuration(args)
-    config = edict(OmegaConf.to_container(configuration.get_config(), resolve=True))
+    config = configuration.get_config()
 
     # setup global logger
     output_dir = os.path.join(config.trainer.output_dir, "EFG", os.getcwd().split("playground")[1][1:])
@@ -84,7 +115,7 @@ def worker(args):
     seed = seed_all_rng(None if config.misc.seed < 0 else config.misc.seed)
     config.misc.seed = seed
 
-    logger.info(f"Running with full config:\n{json.dumps(config, indent=2)}")
+    logger.info(f"Running with full config:\n\n{format_dict_config(config)}")
 
     from net import build_model  # net.py in experiment directories
     trainer = build_trainer(config, build_model)

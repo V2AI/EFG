@@ -5,6 +5,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import numpy as np
+from omegaconf import DictConfig
 
 import torch
 from torch.utils.data.dataset import ConcatDataset as _ConcatDataset
@@ -152,7 +153,7 @@ def build_dataloader(config, dataset, msg=False):
 def build_processors(pipelines):
     transforms = []
     for pipeline in pipelines:
-        if isinstance(pipeline, dict):
+        if isinstance(pipeline, (dict, DictConfig)):
             name, args = pipeline.copy().popitem()
             transform = PROCESSORS.get(name)(**args)
             transforms.append(transform)
