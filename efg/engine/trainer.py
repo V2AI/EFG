@@ -219,7 +219,7 @@ class DefaultTrainer(TrainerBase):
         all_model_checkpoints = sorted(all_model_checkpoints, key=os.path.getmtime)
 
         if len(all_model_checkpoints) > 0:
-            if self.config.model.weights is not None:
+            if self.config.model.weights not in ("", None):
                 matched = np.nonzero(
                     np.array([pts.endswith(self.config.model.weights.split("/")[-1]) for pts in all_model_checkpoints])
                 )[0]
